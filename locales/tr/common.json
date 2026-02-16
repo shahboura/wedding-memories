@@ -29,7 +29,7 @@
     "chooseOrDragDesktop": "Fotoğraf seç veya sürükle bırak",
     "chooseOrDragVideoDesktop": "Fotoğraf/video seç veya sürükle bırak",
     "supportedFormatsS3": "JPG, JPEG, PNG, GIF, WebP, MP4, MOV, AVI, WebM • Boyut sınırı yok",
-    "supportedFormatsCloudinary": "JPG, JPEG, PNG, GIF, WebP, MP4, MOV, AVI, WebM • Fotoğraf max 10MB, Video max 100MB",
+    "supportedFormatsCloudinary": "JPG, JPEG, PNG, GIF, WebP, MP4, MOV, AVI, WebM • Fotoğraf max 20MB, Video max 500MB",
     "dropMoreFiles": "Dosyalarınızı buraya sürükleyin",
     "selectMultiple": "Birden Fazla Dosya Seç",
     "selectAll": "Tümünü Seç",
@@ -160,4 +160,3 @@
     "close": "Kapat"
   }
 }
-

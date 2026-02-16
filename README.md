@@ -15,8 +15,10 @@ A modern, accessible wedding memories gallery supporting **both photos and video
 - **Multiple file upload** with drag & drop, batch selection, and progress tracking
 - **Real-time gallery updates** automatically refresh after uploads
 - **Guest welcome system** with name collection and persistent storage
-- **Multi-storage backend** - Cloudinary and S3/Wasabi with seamless switching
+- **Multi-storage backend** - Cloudinary, S3/Wasabi, and Local filesystem with seamless switching
 - **S3 Presigned URLs** - secure private bucket support with direct browser uploads
+- **Docker support** - production and dev Docker Compose with zero-config local storage
+- **Multi-language support** - English, Turkish, and Malay with runtime switching
 - **Guest isolation mode** - filter media by guest when enabled in config
 - **Advanced validation** with real-time feedback and security-focused rules
 - **Mobile-optimized UX** with touch gestures and responsive design
@@ -28,7 +30,7 @@ A modern, accessible wedding memories gallery supporting **both photos and video
 ## 🛠️ Tech Stack
 
 - **Framework**: Next.js (latest) with App Router & TypeScript
-- **Styling**: Tailwind CSS v4 + shadcn/ui components  
+- **Styling**: Tailwind CSS v4 + shadcn/ui components
 - **Media Storage**: Multi-provider (Cloudinary, S3/Wasabi)
 - **Video Handling**: Direct HTML5 playback with presigned URL uploads
 - **State Management**: Zustand with localStorage persistence
@@ -60,14 +62,15 @@ A modern, accessible wedding memories gallery supporting **both photos and video
 
    ```bash
    pnpm dev
-   # Open http://localhost:3000
+   # Open http://localhost:3010
    ```
 
 ### Configuration Files
 
 **Environment Variables (.env)**
 
-*For Cloudinary Storage:*
+_For Cloudinary Storage:_
+
 ```bash
 # Cloudinary Configuration
 NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=your_cloud_name_here
@@ -76,7 +79,8 @@ CLOUDINARY_API_SECRET=your_api_secret_here
 CLOUDINARY_FOLDER=wedding
 ```
 
-*For S3/Wasabi Storage:*
+_For S3/Wasabi Storage:_
+
 ```bash
 # AWS S3 / Wasabi Configuration
 AWS_REGION=us-east-1
@@ -87,28 +91,33 @@ NEXT_PUBLIC_S3_ENDPOINT=https://s3.wasabisys.com  # Optional: for Wasabi or othe
 ```
 
 **App Configuration (config.ts)**
+
 ```typescript
 export enum StorageProvider {
   Cloudinary = 'cloudinary',
   S3 = 's3',
+  Local = 'local',
 }
 
 export const appConfig = {
-  brideName: 'YourBrideName',
-  groomName: 'YourGroomName',
-  guestIsolation: false, // Set to true to filter photos by guest
-  storage: StorageProvider.Cloudinary, // Storage provider selection
+  brideName: 'YourBrideName', // or set BRIDE_NAME env var
+  groomName: 'YourGroomName', // or set GROOM_NAME env var
+  guestIsolation: false, // or set GUEST_ISOLATION env var
+  storage: StorageProvider.Cloudinary, // or set NEXT_PUBLIC_STORAGE_PROVIDER env var
 };
 ```
 
 **Storage Providers**
+
+- **Local**: Filesystem storage with no cloud dependencies — ideal for Docker / self-hosted deployments
 - **Cloudinary**: Cloud-based media storage with automatic optimization, transformations, and blur placeholders for images/videos
 - **S3/Wasabi**: Object storage compatible with AWS S3 API via secure proxy with request deduplication and stream handling
-- **Seamless Switching**: Change providers instantly by updating `storage` config - no code changes required
+- **Seamless Switching**: Change providers via `NEXT_PUBLIC_STORAGE_PROVIDER` env var or `config.ts` — no code changes required
 - **Smart Media Handling**: Automatic optimization for Cloudinary, proxy-based serving for S3/Wasabi with progressive video loading
 - **Feature Parity**: Download, external links, and all functionality work identically across providers
 
 **S3/Wasabi Presigned URL Architecture**
+
 - **Unified Upload Endpoint**: `/api/upload` handles all media with smart routing based on storage provider
 - **Direct Browser Uploads**: Large files upload directly to S3, bypassing Vercel's 10MB limit
 - **Private Bucket Support**: Full support for private S3 buckets via presigned URLs
@@ -119,6 +128,7 @@ export const appConfig = {
 - **Maintains Features**: All Cloudinary optimizations and S3 uploads work seamlessly
 
 **Guest Isolation Mode**
+
 - When `guestIsolation: true`, each guest only sees photos they uploaded
 - When `guestIsolation: false`, all guests see all photos (default behavior)
 - Server-side rendering shows empty gallery when isolation is enabled
@@ -129,7 +139,8 @@ export const appConfig = {
 ├── app/                    # Next.js App Router
 │   ├── api/               # API routes
 │   │   ├── photos/        # Photo listing endpoint
-│   │   └── upload/        # Unified media upload endpoint
+│   │   ├── upload/        # Unified media upload endpoint
+│   │   └── media/         # Local file serving (path-protected)
 │   ├── page.tsx           # Main gallery page with server components
 │   └── loading.tsx        # Global transparent loading UI
 ├── components/            # React components
@@ -146,7 +157,12 @@ export const appConfig = {
 │   ├── StorageService.ts # Storage interface definition
 │   ├── CloudinaryService.ts # Cloudinary implementation with blur placeholders
 │   ├── S3Service.ts      # S3/Wasabi implementation with presigned URLs
+│   ├── LocalStorageService.ts # Local filesystem implementation
 │   └── index.ts          # Provider selection and export
+├── locales/              # i18n translation files
+│   ├── en/               # English
+│   ├── tr/               # Turkish
+│   └── ms/               # Malay (Bahasa Melayu)
 ├── utils/                # Utilities and helpers
 │   ├── types.ts          # TypeScript interfaces for media data
 │   ├── validation.ts     # Input validation utilities with security focus
@@ -155,13 +171,17 @@ export const appConfig = {
 │   ├── generateBlurPlaceholder.ts # Blur placeholder generation for smooth loading
 │   ├── cloudinary.ts     # Cloudinary API integration
 │   └── testing.ts        # Test utilities and mocks
+├── Dockerfile            # Multi-stage Docker build (deps → build → runner)
+├── docker-compose.yml    # Production Docker Compose
+├── docker-compose.dev.yml # Development override (hot-reload)
+├── .env.docker.example   # Documented Docker env template
 ├── config.ts             # App configuration (couple names, features)
 ```
 
 ## 📝 Development
 
 ```bash
-pnpm dev         # Start development server (http://localhost:3000)
+pnpm dev         # Start development server (http://localhost:3010)
 pnpm build       # Build for production
 pnpm start       # Start production server
 pnpm lint        # Run ESLint code linting
@@ -171,14 +191,32 @@ pnpm type-check  # Run TypeScript type checking
 
 ## 🚀 Deployment
 
-Deploy to [Vercel](https://vercel.com/new/clone) (recommended), Netlify, or any platform supporting Next.js:
+Deploy to [Vercel](https://vercel.com/new/clone) (recommended), Docker, or any platform supporting Next.js:
 
 1. **Vercel (Recommended)**
    - Connect your GitHub repository
    - Configure environment variables in dashboard
    - Automatic deployments on push to main
 
-2. **Other Platforms**
+2. **Docker (Self-Hosted)**
+
+   ```bash
+   # Copy and customise the env file
+   cp .env.docker.example .env
+
+   # Production
+   docker compose up -d --build
+
+   # Development (hot-reload)
+   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+   ```
+
+   - Uses `NEXT_PUBLIC_STORAGE_PROVIDER=local` by default — no cloud credentials needed
+   - Uploaded media persists in a Docker named volume (`wedding-uploads`)
+   - Set `BRIDE_NAME`, `GROOM_NAME`, `DEFAULT_LANGUAGE`, etc. in `.env`
+   - See `.env.docker.example` for all available options
+
+3. **Other Platforms**
    - Ensure Node.js 18+ support
    - Configure all environment variables
    - Set build command: `pnpm build`
@@ -187,7 +225,7 @@ Deploy to [Vercel](https://vercel.com/new/clone) (recommended), Netlify, or any 
 ## 🔍 Code Quality & Features
 
 - **TypeScript strict mode** with comprehensive type safety
-- **WCAG 2.1 AA accessibility** compliance throughout  
+- **WCAG 2.1 AA accessibility** compliance throughout
 - **Security-first validation** with input sanitization and file type checking
 - **Advanced name validation** with real-time feedback, length limits, and character restrictions
 - **Guest isolation system** with server-side and client-side filtering

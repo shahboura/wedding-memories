@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { storage } from '../../../storage';
 import { appConfig } from '../../../config';
+import { checkPhotosRateLimit, createRateLimitHeaders } from '../../../utils/rateLimit';
 import type { MediaProps, ApiErrorResponse } from '../../../utils/types';
 
 /**
@@ -31,6 +32,19 @@ export async function GET(
   request: NextRequest
 ): Promise<NextResponse<MediaProps[] | ApiErrorResponse>> {
   try {
+    // Rate limit check
+    const rateLimitResult = checkPhotosRateLimit(request);
+    if (!rateLimitResult.success) {
+      const errorResponse: ApiErrorResponse = {
+        error: 'Too many requests',
+        details: 'Please wait before refreshing the gallery.',
+      };
+      return NextResponse.json(errorResponse, {
+        status: 429,
+        headers: createRateLimitHeaders(rateLimitResult),
+      });
+    }
+
     // Extract guest filter from query parameters
     const { searchParams } = new URL(request.url);
     const guestFilter = searchParams.get('guest');
@@ -41,7 +55,13 @@ export async function GET(
     // Fetch photos from storage provider
     const photos = await storage.list(guestFilter || undefined);
 
-    return NextResponse.json(photos, { status: 200 });
+    return NextResponse.json(photos, {
+      status: 200,
+      headers: {
+        'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
+        ...createRateLimitHeaders(rateLimitResult),
+      },
+    });
   } catch (error) {
     console.error('Failed to fetch wedding photos:', error);
 

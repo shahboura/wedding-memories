@@ -5,11 +5,17 @@
 
 'use client';
 
-import { Dialog, DialogOverlay, DialogPortal, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogOverlay,
+  DialogPortal,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
 import { StorageAwareMedia } from './StorageAwareMedia';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useKeypress } from '../hooks/useKeypress';
 import { useSwipeable } from 'react-swipeable';
 import {
@@ -23,9 +29,17 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import type { MediaProps } from '../utils/types';
+import { getOptimizedMediaProps } from '../utils/mediaOptimization';
+import { getDownloadUrl, getExternalUrl } from '../utils/imageUrl';
+import { useI18n } from './I18nProvider';
+
 // Inline animation variants
 const variants = {
   enter: {
+    x: 0,
+    opacity: 1,
+  },
+  center: {
     x: 0,
     opacity: 1,
   },
@@ -34,10 +48,6 @@ const variants = {
     opacity: 0,
   },
 };
-import { getOptimizedMediaProps } from '../utils/mediaOptimization';
-import { useMemo } from 'react';
-import { getDownloadUrl, getExternalUrl } from '../utils/imageUrl';
-import { useI18n } from './I18nProvider';
 
 interface MediaModalProps {
   items: MediaProps[];
@@ -48,8 +58,6 @@ interface MediaModalProps {
 
 export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalProps) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
-  const [direction, setDirection] = useState(0);
-  const [, setLoaded] = useState(false);
   const { t } = useI18n();
 
   // Zoom state
@@ -77,7 +85,6 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
   // Update current index when initial index changes or modal opens
   useEffect(() => {
     setCurrentIndex(initialIndex);
-    setLoaded(false);
     // Always reset zoom and pan to ensure proper centering
     setZoom(1);
     setPanX(0);
@@ -158,11 +165,10 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
         }
       });
 
-      setDirection(newIndex > currentIndex ? 1 : -1);
       setCurrentIndex(newIndex);
       resetView();
     },
-    [currentIndex, resetView]
+    [resetView]
   );
 
   // Preload adjacent videos for faster switching
@@ -411,7 +417,8 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
             {currentItem.guestName && ` shared by ${currentItem.guestName}`}
           </DialogTitle>
           <DialogDescription className="sr-only">
-            {currentItem.resource_type === 'video' ? 'Video' : 'Image'} viewer with navigation controls
+            {currentItem.resource_type === 'video' ? 'Video' : 'Image'} viewer with navigation
+            controls
           </DialogDescription>
 
           <MotionConfig
@@ -551,10 +558,9 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
                       </button>
                     )}
 
-                  <AnimatePresence initial={false} custom={direction} mode="wait">
+                  <AnimatePresence initial={false} mode="wait">
                     <motion.div
                       key={`${currentIndex}-${currentItem.id}`}
-                      custom={direction}
                       variants={variants}
                       initial="enter"
                       animate="center"
@@ -575,7 +581,6 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
                           <StorageAwareMedia
                             {...currentMediaProps}
                             context="modal"
-                            onLoad={() => setLoaded(true)}
                             controls={isVideo}
                             className={`${
                               isVideo
@@ -604,23 +609,35 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
                     className="mx-auto mt-0 md:mt-6 flex items-center"
                   >
                     <AnimatePresence initial={false}>
-                      {items.map((item, index) => (
-                        <motion.button
-                          animate={{ scale: index === currentIndex ? 1.15 : 1 }}
-                          transition={{ duration: 0.15 }}
-                          onClick={() => changeMediaIndex(index)}
-                          key={index}
-                          className={`${index === currentIndex ? 'z-20 rounded-md' : 'z-10'} ${index === 0 ? 'rounded-l-md' : ''} ${index === items.length - 1 ? 'rounded-r-md' : ''} relative inline-block w-16 md:w-20 h-16 md:h-20 shrink-0 transform-gpu overflow-hidden focus:outline-none`}
-                        >
-                          <StorageAwareMedia
-                            {...getOptimizedMediaProps(item, 'thumb', {
-                              priority: Math.abs(index - currentIndex) <= 2,
-                              quality: 'thumb',
-                            })}
-                            className={`${index === currentIndex ? 'brightness-110 hover:brightness-110' : 'brightness-50 contrast-125 hover:brightness-75'} h-full transform object-cover transition`}
-                          />
-                        </motion.button>
-                      ))}
+                      {items.map((item, index) => {
+                        // Virtualize: only render thumbnails within ±5 of current index
+                        if (Math.abs(index - currentIndex) > 5) {
+                          return (
+                            <div
+                              key={index}
+                              className="relative inline-block w-16 md:w-20 h-16 md:h-20 shrink-0"
+                              onClick={() => changeMediaIndex(index)}
+                            />
+                          );
+                        }
+                        return (
+                          <motion.button
+                            animate={{ scale: index === currentIndex ? 1.15 : 1 }}
+                            transition={{ duration: 0.15 }}
+                            onClick={() => changeMediaIndex(index)}
+                            key={index}
+                            className={`${index === currentIndex ? 'z-20 rounded-md' : 'z-10'} ${index === 0 ? 'rounded-l-md' : ''} ${index === items.length - 1 ? 'rounded-r-md' : ''} relative inline-block w-16 md:w-20 h-16 md:h-20 shrink-0 transform-gpu overflow-hidden focus:outline-none`}
+                          >
+                            <StorageAwareMedia
+                              {...getOptimizedMediaProps(item, 'thumb', {
+                                priority: Math.abs(index - currentIndex) <= 2,
+                                quality: 'thumb',
+                              })}
+                              className={`${index === currentIndex ? 'brightness-110 hover:brightness-110' : 'brightness-50 contrast-125 hover:brightness-75'} h-full transform object-cover transition`}
+                            />
+                          </motion.button>
+                        );
+                      })}
                     </AnimatePresence>
                   </motion.div>
                 </div>

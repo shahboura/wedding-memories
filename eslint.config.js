@@ -1,62 +1,58 @@
-import { FlatCompat } from '@eslint/eslintrc';
-import js from '@eslint/js';
-import tseslint from '@typescript-eslint/eslint-plugin';
-import tsparser from '@typescript-eslint/parser';
+import { defineConfig, globalIgnores } from 'eslint/config';
+import nextVitals from 'eslint-config-next/core-web-vitals';
+import nextTs from 'eslint-config-next/typescript';
 
-const compat = new FlatCompat({
-  baseDirectory: import.meta.dirname,
-  recommendedConfig: js.configs.recommended,
-});
+const eslintConfig = defineConfig([
+  ...nextVitals,
+  ...nextTs,
 
-export default [
-  // Apply Next.js config to relevant files
-  ...compat.extends('next/core-web-vitals'),
-  
   {
     files: ['**/*.{js,jsx,ts,tsx}'],
-    languageOptions: {
-      parser: tsparser,
-      parserOptions: {
-        ecmaVersion: 'latest',
-        sourceType: 'module',
-      },
-    },
-    plugins: {
-      '@typescript-eslint': tseslint,
-    },
     rules: {
       // TypeScript rules
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       '@typescript-eslint/no-explicit-any': 'warn',
-      
+
       // General rules
       'prefer-const': 'error',
       'no-var': 'error',
       'no-console': ['warn', { allow: ['warn', 'error'] }],
-      'eqeqeq': ['error', 'always'],
-      
+      eqeqeq: ['error', 'always'],
+
       // React rules
       'react/no-unescaped-entities': 'error',
       '@next/next/no-html-link-for-pages': 'error',
+
+      // Disable set-state-in-effect — mount-time initialization via
+      // useEffect(() => setState(...), []) is the standard React pattern
+      // for SSR hydration and client-only state.
+      'react-hooks/set-state-in-effect': 'off',
     },
   },
-  
+
   {
-    files: ['**/*.config.{js,ts}', '**/scripts/**/*.js'],
+    files: ['**/*.config.{js,ts}', '**/scripts/**/*.{js,cjs}'],
     rules: {
-      'no-console': 'off', // Allow console in config files
+      'no-console': 'off', // Allow console in config/scripts
     },
   },
-  
+
   {
-    ignores: [
-      '.next/**',
-      'node_modules/**',
-      'out/**',
-      'build/**',
-      'dist/**',
-      '.env*',
-      '*.config.js',
-    ],
+    files: ['**/*.cjs'],
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off', // CJS files use require()
+    },
   },
-];
+
+  globalIgnores([
+    '.next/**',
+    'node_modules/**',
+    'out/**',
+    'build/**',
+    'dist/**',
+    '.env*',
+    'next-env.d.ts',
+  ]),
+]);
+
+export default eslintConfig;

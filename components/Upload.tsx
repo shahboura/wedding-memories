@@ -130,10 +130,9 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
   const isValidMediaFile = (file: File): boolean => {
     try {
       const isS3Storage = appConfig.storage === StorageProvider.S3;
-      
-      
+
       // Cloudinary: allowVideos=true, enforceFileSize=true
-      // S3: allowVideos=true, enforceFileSize=false  
+      // S3: allowVideos=true, enforceFileSize=false
       return validateMediaFile(file, true, !isS3Storage);
     } catch {
       return false;
@@ -141,7 +140,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
   };
 
   const createThumbnail = (file: File): Promise<string> => {
-    return new Promise((resolve, _reject) => {
+    return new Promise((resolve) => {
       try {
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
@@ -219,7 +218,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
             }
           };
 
-          video.onerror = (_error) => {
+          video.onerror = () => {
             clearTimeout(timeoutId);
             cleanup();
             resolve('');
@@ -256,7 +255,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
           }
         };
 
-        reader.onerror = (_error) => {
+        reader.onerror = () => {
           // Fallback olarak object URL dene
           try {
             const objectUrl = URL.createObjectURL(file);
@@ -575,7 +574,8 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
             ? {
                 ...f,
                 status: 'error',
-                error: uploadError instanceof Error ? uploadError.message : t('errors.uploadFailed'),
+                error:
+                  uploadError instanceof Error ? uploadError.message : t('errors.uploadFailed'),
               }
             : f
         )
@@ -632,6 +632,9 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
     const sanitizedName = validateGuestName(rawValue, t);
 
     setGuestName(sanitizedName);
+    // Blur the focused input before closing so Radix doesn't apply
+    // aria-hidden to an ancestor that still contains the focused element.
+    nameInputRef.current?.blur();
     setIsEditingName(false);
     setIsUpdatingName(false);
   };
@@ -846,7 +849,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
                         }
                       }
                     }}
-                    onTouchStart={(_e) => {
+                    onTouchStart={() => {
                       if (!isSelectionMode && uploadFile.status === 'pending') {
                         // Mobile: Long press starts multi-select
                         const touchTimer = setTimeout(() => {
@@ -874,23 +877,12 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
                         className="w-full h-full object-cover transition-all duration-200"
                       />
                     ) : uploadFile.file.type.startsWith('video/') ? (
-                      // Mobile: Use Image with video URL, Desktop: Use placeholder until thumbnail loads
-                      isLargeScreen ? (
-                        <div className="w-full h-full bg-gradient-to-br from-blue-50 to-blue-100 flex flex-col items-center justify-center">
-                          <div className="text-2xl mb-1">🎬</div>
-                          <div className="text-xs text-gray-600 text-center px-1">
-                            {uploadFile.file.name.split('.').pop()?.toUpperCase()}
-                          </div>
+                      <div className="w-full h-full bg-gradient-to-br from-blue-50 to-blue-100 flex flex-col items-center justify-center">
+                        <div className="text-2xl mb-1">🎬</div>
+                        <div className="text-xs text-gray-600 text-center px-1">
+                          {uploadFile.file.name.split('.').pop()?.toUpperCase()}
                         </div>
-                      ) : (
-                        <Image
-                          src={URL.createObjectURL(uploadFile.file)}
-                          alt={uploadFile.file.name}
-                          width={100}
-                          height={100}
-                          className="w-full h-full object-cover transition-all duration-200"
-                        />
-                      )
+                      </div>
                     ) : (
                       <div className="w-full h-full bg-muted/20 flex items-center justify-center">
                         <Camera className="w-8 h-8 text-muted-foreground" />
@@ -962,7 +954,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
                             compressionInfo.willCompress && (
                               <span
                                 className="text-orange-600 ml-1"
-                                title={`Will be compressed by ${compressionInfo.estimatedSizeReduction} to fit 10MB limit`}
+                                title={`Will be compressed by ${compressionInfo.estimatedSizeReduction} to fit 20MB limit`}
                               >
                                 ⚡ -{compressionInfo.estimatedSizeReduction}
                               </span>
@@ -1156,7 +1148,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
             }
           }}
         >
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="sm:max-w-md" onCloseAutoFocus={(e) => e.preventDefault()}>
             <DialogHeader>
               <DialogTitle>{t('nameDialog.title')}</DialogTitle>
               <DialogDescription>{t('nameDialog.description')}</DialogDescription>
@@ -1181,6 +1173,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
                       }
                     } else if (e.key === 'Escape') {
                       e.preventDefault();
+                      nameInputRef.current?.blur();
                       setIsEditingName(false);
                     }
                   }}
@@ -1201,6 +1194,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
                 variant="outline"
                 onClick={() => {
                   if (!isUpdatingName) {
+                    nameInputRef.current?.blur();
                     setIsEditingName(false);
                   }
                 }}
@@ -1316,7 +1310,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
           }
         }}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md" onCloseAutoFocus={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>{t('nameDialog.title')}</DialogTitle>
             <DialogDescription>{t('nameDialog.descriptionMobile')}</DialogDescription>
@@ -1341,6 +1335,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
                     }
                   } else if (e.key === 'Escape') {
                     e.preventDefault();
+                    nameInputRef.current?.blur();
                     setIsEditingName(false);
                   }
                 }}
@@ -1361,6 +1356,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
               variant="outline"
               onClick={() => {
                 if (!isUpdatingName) {
+                  nameInputRef.current?.blur();
                   setIsEditingName(false);
                 }
               }}

@@ -34,7 +34,6 @@ yarn-error.log*
 .env
 
 # package manager lock files
-pnpm-lock.yaml
 yarn.lock
 package-lock.json
 bun.lockb
@@ -45,3 +44,10 @@ bun.lockb
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# opencode
+.opencode/
+opencode.json
+
+# local uploads (Docker volume)
+/uploads/

@@ -1,0 +1,48 @@
+services:
+  wedding-memories:
+    build: .
+    ports:
+      - '${PORT:-3010}:3010'
+    environment:
+      # ---------------------------------------------------------------
+      # Storage provider: "local" | "cloudinary" | "s3"
+      # ---------------------------------------------------------------
+      - NEXT_PUBLIC_STORAGE_PROVIDER=${NEXT_PUBLIC_STORAGE_PROVIDER:-local}
+
+      # ---------------------------------------------------------------
+      # Local storage (when NEXT_PUBLIC_STORAGE_PROVIDER=local)
+      # ---------------------------------------------------------------
+      - LOCAL_STORAGE_PATH=/app/uploads
+
+      # ---------------------------------------------------------------
+      # App configuration
+      # ---------------------------------------------------------------
+      - BRIDE_NAME=${BRIDE_NAME:-Bride}
+      - GROOM_NAME=${GROOM_NAME:-Groom}
+      - GUEST_ISOLATION=${GUEST_ISOLATION:-true}
+      - DEFAULT_LANGUAGE=${DEFAULT_LANGUAGE:-en}
+
+      # ---------------------------------------------------------------
+      # Cloudinary (when NEXT_PUBLIC_STORAGE_PROVIDER=cloudinary)
+      # ---------------------------------------------------------------
+      - NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=${NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME:-}
+      - CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY:-}
+      - CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET:-}
+      - CLOUDINARY_FOLDER=${CLOUDINARY_FOLDER:-wedding}
+
+      # ---------------------------------------------------------------
+      # S3 / Wasabi (when NEXT_PUBLIC_STORAGE_PROVIDER=s3)
+      # ---------------------------------------------------------------
+      - AWS_REGION=${AWS_REGION:-}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - NEXT_PUBLIC_S3_BUCKET=${NEXT_PUBLIC_S3_BUCKET:-}
+      - NEXT_PUBLIC_S3_ENDPOINT=${NEXT_PUBLIC_S3_ENDPOINT:-}
+    volumes:
+      # Persist uploaded media across container restarts.
+      # Only used when NEXT_PUBLIC_STORAGE_PROVIDER=local.
+      - wedding-uploads:/app/uploads
+    restart: unless-stopped
+
+volumes:
+  wedding-uploads:

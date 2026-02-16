@@ -1,8 +1,8 @@
 /**
- * Storage-aware media component that handles both Cloudinary and S3/Wasabi storage.
+ * Storage-aware media component that handles Cloudinary, S3/Wasabi, and Local storage.
  *
  * - For Cloudinary: Uses Next.js Image for optimization or a video tag.
- * - For S3/Wasabi: Uses direct img/video tags to avoid optimization issues.
+ * - For S3/Wasabi/Local: Uses direct img/video tags to avoid optimization issues.
  */
 
 import Image from 'next/image';
@@ -12,9 +12,16 @@ import { useI18n } from './I18nProvider';
 import type { MediaProps } from '../utils/types';
 import { Play, Video } from 'lucide-react';
 
+let _cachedIsMobile: boolean | null = null;
+
 const isMobileDevice = () => {
   if (typeof window === 'undefined') return false;
-  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  if (_cachedIsMobile === null) {
+    _cachedIsMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+      navigator.userAgent
+    );
+  }
+  return _cachedIsMobile;
 };
 
 const isDesktopDevice = () => {
@@ -38,9 +45,6 @@ interface StorageAwareMediaProps extends Omit<MediaProps, 'id' | 'public_id'> {
   poster?: string;
   controls?: boolean;
   context?: 'gallery' | 'modal' | 'thumb';
-  videoId?: string;
-  duration?: number;
-  guestName?: string;
 }
 
 export function StorageAwareMedia({
@@ -63,9 +67,6 @@ export function StorageAwareMedia({
   poster,
   controls,
   context = 'gallery',
-  videoId: _videoId,
-  duration: _duration,
-  guestName: _guestName,
 }: StorageAwareMediaProps) {
   const isCloudinary = appConfig.storage === StorageProvider.Cloudinary;
   const widthNum = parseInt(width, 10);
@@ -271,16 +272,16 @@ export function StorageAwareMedia({
           ref={videoRef}
           src={src}
           className={`${className} opacity-100 w-full h-full object-contain`}
-          style={{
-            ...style,
-          }}
+          style={style}
           controls={controls}
           poster={poster}
           onPlay={handlePlay}
           draggable={draggable}
           playsInline
           muted={isGalleryView}
-          preload={context === 'thumb' ? 'metadata' : 'auto'}
+          preload={
+            context === 'thumb' ? 'metadata' : context === 'gallery' && isMobile ? 'none' : 'auto'
+          }
           disablePictureInPicture={isMobile}
           onLoadedMetadata={() => {
             // Force show first frame on mobile for thumbnails
@@ -323,10 +324,17 @@ export function StorageAwareMedia({
         />
       );
     }
-    
+
     // For gallery/thumb contexts, use wrapper with aspect ratio
     return (
-      <div className="relative" style={context === 'thumb' ? { width: '80px', height: '80px' } : { aspectRatio: `${widthNum}/${heightNum}` }}>
+      <div
+        className="relative"
+        style={
+          context === 'thumb'
+            ? { width: '80px', height: '80px' }
+            : { aspectRatio: `${widthNum}/${heightNum}` }
+        }
+      >
         {/* Loading skeleton */}
         {isLoading && (
           <div className="absolute inset-0 bg-gray-200 dark:bg-gray-800 animate-pulse rounded-lg" />
@@ -390,10 +398,17 @@ export function StorageAwareMedia({
       />
     );
   }
-  
+
   // For gallery/thumb contexts, use wrapper with aspect ratio
   return (
-    <div className="relative" style={context === 'thumb' ? { width: '80px', height: '80px' } : { aspectRatio: `${widthNum}/${heightNum}` }}>
+    <div
+      className="relative"
+      style={
+        context === 'thumb'
+          ? { width: '80px', height: '80px' }
+          : { aspectRatio: `${widthNum}/${heightNum}` }
+      }
+    >
       {/* Loading skeleton */}
       {isLoading && (
         <div className="absolute inset-0 bg-gray-200 dark:bg-gray-800 animate-pulse rounded-lg" />

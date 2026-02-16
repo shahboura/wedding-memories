@@ -1,0 +1,19 @@
+# ============================================================
+# Development override — run with:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+# ============================================================
+services:
+  wedding-memories:
+    build:
+      context: .
+      target: deps # Stop at deps stage — no production build
+    command: pnpm dev
+    environment:
+      - NODE_ENV=development
+    volumes:
+      # Mount source code for hot-reload
+      - .:/app
+      # Preserve container's node_modules (don't overlay with host's)
+      - /app/node_modules
+      # Persist uploads
+      - wedding-uploads:/app/uploads

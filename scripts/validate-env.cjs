@@ -58,16 +58,33 @@ function isValidValue(value) {
 }
 
 function validateEnvironment() {
-  // Determine storage provider from config.ts by reading the file
-  let storageProvider = 'cloudinary';
-  try {
-    const fs = require('fs');
-    const configContent = fs.readFileSync('config.ts', 'utf8');
-    if (configContent.includes('StorageProvider.S3')) {
-      storageProvider = 's3';
+  // Determine storage provider from env var first, then config.ts
+  let storageProvider = (process.env.NEXT_PUBLIC_STORAGE_PROVIDER || '').toLowerCase();
+
+  if (!storageProvider) {
+    try {
+      const fs = require('fs');
+      const configContent = fs.readFileSync('config.ts', 'utf8');
+      if (configContent.includes('StorageProvider.S3')) {
+        storageProvider = 's3';
+      } else if (configContent.includes('StorageProvider.Local')) {
+        storageProvider = 'local';
+      } else {
+        storageProvider = 'cloudinary';
+      }
+    } catch {
+      storageProvider = 'cloudinary';
     }
-  } catch {
-    // Default to cloudinary if can't read config
+  }
+
+  // Local storage requires no cloud credentials
+  if (storageProvider === 'local') {
+    return {
+      valid: true,
+      storageProvider,
+      missing: [],
+      invalid: [],
+    };
   }
 
   const missing = [];
@@ -136,16 +153,21 @@ function main() {
     log(''); // Empty line
 
     // Show required environment variables
-    const allVars = [...(result.storageProvider === 'cloudinary' ? CLOUDINARY_VARS : S3_VARS)];
+    if (result.storageProvider === 'local') {
+      logSuccess('Local storage mode - no cloud credentials required.');
+      logInfo(`Storage path: ${process.env.LOCAL_STORAGE_PATH || '/app/uploads'}`);
+    } else {
+      const allVars = [...(result.storageProvider === 'cloudinary' ? CLOUDINARY_VARS : S3_VARS)];
 
-    log(`${colors.bold}Environment Variables Check:${colors.reset}`);
-    allVars.forEach((varName) => {
-      const value = process.env[varName];
-      const isValid = value && isValidValue(value);
-      const status = isValid ? '✓' : '✗';
-      const statusColor = isValid ? colors.green : colors.red;
-      log(`  ${statusColor}${status}${colors.reset} ${varName}`);
-    });
+      log(`${colors.bold}Environment Variables Check:${colors.reset}`);
+      allVars.forEach((varName) => {
+        const value = process.env[varName];
+        const isValid = value && isValidValue(value);
+        const status = isValid ? '\u2713' : '\u2717';
+        const statusColor = isValid ? colors.green : colors.red;
+        log(`  ${statusColor}${status}${colors.reset} ${varName}`);
+      });
+    }
 
     log(''); // Empty line
     log(`${colors.bold}Validation Results:${colors.reset}`);
@@ -205,8 +227,12 @@ function main() {
 
 // Run only if called directly (not imported)
 if (require.main === module) {
+  // Allow skipping validation during Docker builds (credentials aren't available yet)
+  if (process.env.SKIP_ENV_VALIDATION === '1' || process.env.SKIP_ENV_VALIDATION === 'true') {
+    console.log('⏭️  Skipping environment validation (SKIP_ENV_VALIDATION is set)');
+    process.exit(0);
+  }
   main();
 }
 
 module.exports = { main };
-

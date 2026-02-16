@@ -28,27 +28,6 @@ export interface MediaProps {
 }
 
 /**
- * Props for the shared modal component used for media viewing.
- * Handles navigation between media items and modal state management.
- */
-export interface SharedModalProps {
-  /** Current media index in the items array */
-  index: number;
-  /** Array of all available media items */
-  items?: MediaProps[];
-  /** Currently displayed media data */
-  currentItem?: MediaProps;
-  /** Function to change the displayed media by ID */
-  changeItemId: (newItemId: number) => void;
-  /** Function to close the modal */
-  closeModal: () => void;
-  /** Whether navigation controls should be shown */
-  navigation: boolean;
-  /** Direction of navigation (-1 for previous, 1 for next) */
-  direction?: number;
-}
-
-/**
  * Upload file status during the upload process.
  */
 export type UploadStatus = 'pending' | 'uploading' | 'success' | 'error';
@@ -74,71 +53,9 @@ export interface UploadFile {
 }
 
 /**
- * Environment variables interface for type safety.
- */
-export interface EnvironmentConfig {
-  NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: string;
-  CLOUDINARY_API_KEY: string;
-  CLOUDINARY_API_SECRET: string;
-  CLOUDINARY_FOLDER: string;
-}
-
-/**
- * API response for upload operations.
- */
-export interface UploadResponse {
-  public_id: string;
-  version: number;
-  signature: string;
-  width: number;
-  height: number;
-  format: string;
-  resource_type: string;
-  created_at: string;
-  tags: string[];
-  bytes: number;
-  type: string;
-  etag: string;
-  placeholder: boolean;
-  url: string;
-  secure_url: string;
-  context?: {
-    guest?: string;
-  };
-}
-
-/**
  * Error response from API endpoints.
  */
 export interface ApiErrorResponse {
   error: string;
   details?: string;
-}
-
-/**
- * Standard API response wrapper.
- */
-export type ApiResponse<T> = T | ApiErrorResponse;
-
-
-/**
- * Props for the guest name input component.
- */
-export interface GuestNameInputProps {
-  /** Whether the input is disabled */
-  disabled?: boolean;
-  /** Callback when guest name is submitted */
-  onNameSubmit: (name: string) => void;
-}
-
-/**
- * Props for the welcome dialog component.
- */
-export interface WelcomeDialogProps {
-  /** Whether the dialog is open */
-  isOpen: boolean;
-  /** Callback when the dialog is closed */
-  onClose: () => void;
-  /** Callback when guest name is submitted */
-  onNameSubmit: (name: string) => void;
 }

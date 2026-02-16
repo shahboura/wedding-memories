@@ -1,15 +1,26 @@
 import type { MediaProps } from './types';
+import { appConfig, StorageProvider } from '../config';
 
-const cache = new Map<MediaProps, string>();
+const cache = new Map<string, string>();
+
+// Simple grey placeholder for non-Cloudinary storage (no CDN-based blur generation)
+const GREY_PLACEHOLDER =
+  'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyfiWVBpGhEJHaPj/fJZ5bheT4FS5q/QIIqqOqNHcKBQKiBLIj3bDfPdA4h5/nKuJk7B+3JT6OX//Z';
 
 export default async function getBase64ImageUrl(image: MediaProps): Promise<string> {
-  let url = cache.get(image);
+  const cacheKey = image.public_id;
+  let url = cache.get(cacheKey);
   if (url) {
     return url;
   }
 
   if (image.resource_type === 'video') {
     return '';
+  }
+
+  // Blur placeholders via Cloudinary CDN only work for Cloudinary storage
+  if (appConfig.storage !== StorageProvider.Cloudinary) {
+    return GREY_PLACEHOLDER;
   }
 
   try {
@@ -23,13 +34,10 @@ export default async function getBase64ImageUrl(image: MediaProps): Promise<stri
 
     const buffer = await response.arrayBuffer();
     url = `data:image/jpeg;base64,${Buffer.from(buffer).toString('base64')}`;
-    cache.set(image, url);
+    cache.set(cacheKey, url);
     return url;
   } catch (error) {
     console.error('Error generating blur placeholder:', error);
-    // Return a simple grey placeholder as fallback
-    const greyPixel =
-      'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyfiWVBpGhEJHaPj/fJZ5bheT4FS5q/QIIqqOqNHcKBQKiBLIj3bDfPdA4h5/nKuJk7B+3JT6OX//Z';
-    return greyPixel;
+    return GREY_PLACEHOLDER;
   }
 }

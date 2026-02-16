@@ -23,7 +23,7 @@ interface RateLimitConfig {
 /**
  * Rate limit result
  */
-export interface RateLimitResult {
+interface RateLimitResult {
   success: boolean;
   limit: number;
   remaining: number;
@@ -61,7 +61,7 @@ class RateLimitStore {
    */
   performMaintenance(): void {
     const now = Date.now();
-    
+
     // Global cleanup every minute
     if (now - this.lastGlobalCleanup > this.CLEANUP_INTERVAL) {
       this.cleanup(now);
@@ -74,8 +74,8 @@ class RateLimitStore {
    */
   private cleanup(now: number): void {
     // Remove entries that haven't been used in 15 minutes
-    const expireTime = now - (15 * 60 * 1000);
-    
+    const expireTime = now - 15 * 60 * 1000;
+
     const entries = Array.from(this.store.entries());
     for (const [key, window] of entries) {
       if (window.lastCleanup < expireTime) {
@@ -87,7 +87,7 @@ class RateLimitStore {
     if (this.store.size > this.MAX_ENTRIES) {
       const allEntries = Array.from(this.store.entries());
       allEntries.sort(([, a], [, b]) => a.lastCleanup - b.lastCleanup);
-      
+
       const toRemove = allEntries.slice(0, this.store.size - this.MAX_ENTRIES);
       toRemove.forEach(([key]) => this.store.delete(key));
     }
@@ -116,23 +116,23 @@ class SlidingWindowRateLimit {
    */
   check(identifier: string): RateLimitResult {
     rateLimitStore.performMaintenance();
-    
+
     const key = `${this.config.identifier}:${identifier}`;
     const window = rateLimitStore.getWindow(key);
     const now = Date.now();
-    
+
     // Update cleanup timestamp
     window.lastCleanup = now;
-    
+
     // Remove requests outside the window
     const windowStart = now - this.config.windowMs;
-    window.requests = window.requests.filter(timestamp => timestamp > windowStart);
-    
+    window.requests = window.requests.filter((timestamp) => timestamp > windowStart);
+
     // Check if limit would be exceeded
     if (window.requests.length >= this.config.maxRequests) {
       const oldestRequest = Math.min(...window.requests);
       const retryAfterMs = this.config.windowMs - (now - oldestRequest);
-      
+
       return {
         success: false,
         limit: this.config.maxRequests,
@@ -141,10 +141,10 @@ class SlidingWindowRateLimit {
         retryAfterSeconds: Math.ceil(retryAfterMs / 1000),
       };
     }
-    
+
     // Add current request
     window.requests.push(now);
-    
+
     return {
       success: true,
       limit: this.config.maxRequests,
@@ -156,34 +156,32 @@ class SlidingWindowRateLimit {
 
 /**
  * Wedding-optimized rate limiters
+ *
+ * A single sustained limiter is sufficient for a wedding app — guests
+ * naturally upload in bursts (selecting 10-15 photos at once) and a
+ * per-minute burst cap would only frustrate legitimate users.
  */
-export const uploadRateLimit = new SlidingWindowRateLimit({
+const uploadRateLimit = new SlidingWindowRateLimit({
   windowMs: 10 * 60 * 1000, // 10 minutes
-  maxRequests: 50, // 50 uploads per 10 minutes (300/hour)
+  maxRequests: 60, // 60 uploads per 10 minutes (360/hour)
   identifier: 'upload',
 });
 
-export const burstUploadRateLimit = new SlidingWindowRateLimit({
+const photosRateLimit = new SlidingWindowRateLimit({
   windowMs: 60 * 1000, // 1 minute
-  maxRequests: 20, // 20 uploads per minute
-  identifier: 'burst',
-});
-
-export const apiRateLimit = new SlidingWindowRateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  maxRequests: 200, // 200 API calls per minute
-  identifier: 'api',
+  maxRequests: 60, // 60 requests per minute per client
+  identifier: 'photos',
 });
 
 /**
  * Extracts client identifier from request
  * Uses multiple fallbacks for reliable identification
  */
-export function getClientIdentifier(request: Request): string {
+function getClientIdentifier(request: Request): string {
   // Try various IP headers (Vercel, Cloudflare, etc.)
   const headers = [
     'x-forwarded-for',
-    'x-real-ip', 
+    'x-real-ip',
     'cf-connecting-ip',
     'x-client-ip',
     'x-forwarded',
@@ -207,44 +205,33 @@ export function getClientIdentifier(request: Request): string {
 }
 
 /**
- * Enhanced upload rate limiting with dual limits
- * Prevents both sustained abuse and burst spam
+ * Photos API rate limiting
+ * Prevents scraping/abuse of the gallery listing endpoint
  */
-export function checkUploadRateLimit(request: Request): RateLimitResult & {
-  type?: 'burst' | 'sustained';
-  message?: string;
-} {
+export function checkPhotosRateLimit(request: Request): RateLimitResult {
   const identifier = getClientIdentifier(request);
-  
-  // Check burst limit first (stricter, shorter window)
-  const burstResult = burstUploadRateLimit.check(identifier);
-  if (!burstResult.success) {
-    return {
-      ...burstResult,
-      type: 'burst',
-      message: 'Please slow down! You can upload up to 20 photos per minute.',
-    };
-  }
-  
-  // Check sustained limit
-  const sustainedResult = uploadRateLimit.check(identifier);
-  if (!sustainedResult.success) {
-    return {
-      ...sustainedResult,
-      type: 'sustained', 
-      message: "You've shared many beautiful photos! Please wait a few minutes before uploading more.",
-    };
-  }
-  
-  return sustainedResult;
+  return photosRateLimit.check(identifier);
 }
 
 /**
- * API rate limiting for general endpoints
+ * Enhanced upload rate limiting
+ * Prevents sustained abuse while being generous for normal wedding use
  */
-export function checkApiRateLimit(request: Request): RateLimitResult {
+export function checkUploadRateLimit(request: Request): RateLimitResult & {
+  message?: string;
+} {
   const identifier = getClientIdentifier(request);
-  return apiRateLimit.check(identifier);
+
+  const result = uploadRateLimit.check(identifier);
+  if (!result.success) {
+    return {
+      ...result,
+      message:
+        "You've shared many beautiful photos! Please wait a few minutes before uploading more.",
+    };
+  }
+
+  return result;
 }
 
 /**
@@ -257,24 +244,10 @@ export function createRateLimitHeaders(result: RateLimitResult): Record<string, 
     'X-RateLimit-Remaining': result.remaining.toString(),
     'X-RateLimit-Reset': Math.ceil(result.resetTime / 1000).toString(),
   };
-  
+
   if (result.retryAfterSeconds) {
     headers['Retry-After'] = result.retryAfterSeconds.toString();
   }
-  
-  return headers;
-}
 
-/**
- * Development utility to get rate limiter stats
- * Useful for monitoring and debugging
- */
-export function getRateLimitStats(): {
-  storeSize: number;
-  memoryUsage: string;
-} {
-  return {
-    storeSize: rateLimitStore.getSize(),
-    memoryUsage: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`,
-  };
+  return headers;
 }

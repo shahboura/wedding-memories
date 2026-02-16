@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useRef } from 'react';
 
 /**
  * Custom hook to handle keypress events
@@ -16,7 +16,12 @@ export function useKeypress(
     target?: EventTarget;
   }
 ) {
-  const memoizedHandler = useCallback(handler, [handler]);
+  // Use a ref to always have the latest handler without re-subscribing
+  const handlerRef = useRef(handler);
+
+  useEffect(() => {
+    handlerRef.current = handler;
+  });
 
   useEffect(() => {
     if (options?.disabled) return;
@@ -26,9 +31,9 @@ export function useKeypress(
     const handleKeydown = (event: KeyboardEvent) => {
       // Handle different key representations
       const key = event.key;
-      
+
       // Check for exact match or common aliases
-      const isTargetKey = 
+      const isTargetKey =
         key === targetKey ||
         // Handle + key (which can be = or +)
         (targetKey === '+' && (key === '+' || key === '=')) ||
@@ -51,8 +56,8 @@ export function useKeypress(
         if (options?.stopPropagation) {
           event.stopPropagation();
         }
-        
-        memoizedHandler(event);
+
+        handlerRef.current(event);
       }
     };
 
@@ -63,7 +68,7 @@ export function useKeypress(
     return () => {
       target.removeEventListener('keydown', handleKeydown as EventListener);
     };
-  }, [targetKey, memoizedHandler, options]);
+  }, [targetKey, options]);
 }
 
 export default useKeypress;

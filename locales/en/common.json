@@ -29,7 +29,7 @@
     "chooseOrDragDesktop": "Choose photos or drag & drop",
     "chooseOrDragVideoDesktop": "Choose photos/videos or drag & drop",
     "supportedFormatsS3": "JPG, JPEG, PNG, GIF, WebP, MP4, MOV, AVI, WebM • No size limit",
-    "supportedFormatsCloudinary": "JPG, JPEG, PNG, GIF, WebP, MP4, MOV, AVI, WebM • Photos max 10MB, Videos max 100MB",
+    "supportedFormatsCloudinary": "JPG, JPEG, PNG, GIF, WebP, MP4, MOV, AVI, WebM • Photos max 20MB, Videos max 500MB",
     "dropMoreFiles": "Drop more files here",
     "selectMultiple": "Select Multiple Files",
     "selectAll": "Select All",
@@ -146,7 +146,7 @@
   "common": {
     "loading": "Loading",
     "loadingMemories": "Loading beautiful memories...",
-    "weddingMemories": "Wedding Memories", 
+    "weddingMemories": "Wedding Memories",
     "error": "Error",
     "videoUnavailable": "Video unavailable",
     "failedToLoad": "Failed to load",

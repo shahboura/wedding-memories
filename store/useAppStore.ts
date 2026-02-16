@@ -27,7 +27,7 @@ interface AppState {
   _hasHydrated: boolean;
 }
 
-export const useAppStore = create<AppState>()(
+const useAppStore = create<AppState>()(
   persist(
     (set, _get) => ({
       guestName: '',
@@ -88,13 +88,8 @@ export const useSelectedMediaIndex = () => useAppStore((state) => state.selected
 export const useOpenMediaModal = () => useAppStore((state) => state.openMediaModal);
 export const useCloseMediaModal = () => useAppStore((state) => state.closeMediaModal);
 
-export const useUploadModalOpen = () => useAppStore((state) => state.isUploadModalOpen);
-export const useOpenUploadModal = () => useAppStore((state) => state.openUploadModal);
-export const useCloseUploadModal = () => useAppStore((state) => state.closeUploadModal);
-
 export const useIsLoadingMedia = () => useAppStore((state) => state.isLoadingMedia);
 export const useLastRefreshTime = () => useAppStore((state) => state.lastRefreshTime);
 export const useSetIsLoadingMedia = () => useAppStore((state) => state.setIsLoadingMedia);
 export const useRefreshMedia = () => useAppStore((state) => state.refreshMedia);
 export const useHasHydrated = () => useAppStore((state) => state._hasHydrated);
-

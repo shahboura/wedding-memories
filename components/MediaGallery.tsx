@@ -1,15 +1,15 @@
 'use client';
 
-import { useEffect, useCallback, useRef, useState } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import type { MediaProps } from '../utils/types';
 import { appConfig } from '../config';
 import { getOptimizedMediaProps, prefetchMediaOnInteraction } from '../utils/mediaOptimization';
 import { StorageAwareMedia } from './StorageAwareMedia';
-import MediaModal from './MediaModal';
-import { GuestNameInput } from './GuestNameInput';
-import { Button } from './ui/button';
-import { validateGuestName } from '../utils/validation';
-import { useToast } from '@/hooks/use-toast';
+import dynamic from 'next/dynamic';
+import { GuestNameForm } from './GuestNameForm';
+
+const MediaModal = dynamic(() => import('./MediaModal'), { ssr: false });
+
 import {
   useMedia,
   useSetMedia,
@@ -22,7 +22,6 @@ import {
   useSetIsLoadingMedia,
   useRefreshMedia,
   useGuestName,
-  useSetGuestName,
   useHasHydrated,
 } from '../store/useAppStore';
 import { useI18n } from './I18nProvider';
@@ -45,7 +44,6 @@ function formatUploadDate(dateString: string, locale: string = 'en-US'): string 
     return 'Date unavailable';
   }
 }
-
 
 function handleMediaKeyNavigation(
   event: React.KeyboardEvent,
@@ -70,14 +68,9 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
   const setIsLoading = useSetIsLoadingMedia();
   const refresh = useRefreshMedia();
   const guestName = useGuestName();
-  const setGuestName = useSetGuestName();
   const hasHydrated = useHasHydrated();
   const previousGuestName = useRef<string | null>(null);
   const { t, language } = useI18n();
-  const { toast } = useToast();
-
-  const [name, setName] = useState('');
-  const [isNameValid, setIsNameValid] = useState(false);
 
   useEffect(() => {
     if (initialMedia.length > 0 && media.length === 0) {
@@ -111,8 +104,8 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
         } else {
           console.error('Failed to refetch media:', response.statusText);
         }
-      } catch (_error) {
-        console.error('Network error while refetching media:', _error);
+      } catch (error) {
+        console.error('Network error while refetching media:', error);
       } finally {
         if (showLoading) {
           setIsLoading(false);
@@ -135,105 +128,11 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
     }
   }, [guestName, refetchWeddingMediaInternal]);
 
-  const openMediaModal = useCallback(
-    (mediaIndex: number) => {
-      openModal(mediaIndex);
-    },
-    [openModal]
-  );
-
-  const handleValidationChange = (isValid: boolean, _error: string | null) => {
-    setIsNameValid(isValid);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!isNameValid || !name.trim()) {
-      toast({
-        variant: 'destructive',
-        title: t('errors.nameRequired'),
-        description: t('errors.nameRequiredDescription'),
-      });
-      return;
-    }
-    // Use validated and sanitized name
-    try {
-      const sanitizedName = validateGuestName(name, t);
-      setGuestName(sanitizedName);
-      toast({
-        title: t('success.welcome'),
-        description: t('success.welcomeDescription', { name: sanitizedName }),
-      });
-    } catch (_error) {
-      // This shouldn't happen if validation is working correctly in GuestNameInput
-      toast({
-        variant: 'destructive',
-        title: t('errors.validationError'),
-        description:
-          _error instanceof Error ? _error.message : t('errors.validationErrorDescription'),
-      });
-    }
-  };
-
   // Show name input when guest name hasn't been set yet
   const shouldShowNameInput = hasHydrated && !guestName;
 
   if (shouldShowNameInput) {
-    return (
-      <div className="max-w-md mx-auto py-16 px-4">
-        <div className="text-center space-y-6">
-          <div>
-            <h1 className="text-3xl font-serif font-light text-foreground leading-tight mb-2">
-              <span className="text-primary font-medium">{appConfig.brideName}</span>
-              <span className="text-muted-foreground mx-2 font-light">&</span>
-              <span className="text-primary font-medium">{appConfig.groomName}</span>
-            </h1>
-            <p className="text-muted-foreground">{t('gallery.weddingMemories')}</p>
-          </div>
-
-          <div className="bg-card rounded-lg border p-6 shadow-sm">
-            <h2 className="text-xl font-semibold mb-2">
-              {t('gallery.welcome', {
-                brideName: appConfig.brideName,
-                groomName: appConfig.groomName,
-              })}
-            </h2>
-            <p className="text-muted-foreground mb-6">
-              {t('gallery.enterNamePrompt', {
-                brideName: appConfig.brideName,
-                groomName: appConfig.groomName,
-              })}
-            </p>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <GuestNameInput
-                value={name}
-                onChange={setName}
-                onValidationChange={handleValidationChange}
-                placeholder={t('welcome.placeholder')}
-                className="text-center text-lg h-12"
-                autoFocus
-                t={t}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    if (isNameValid) {
-                      handleSubmit(e);
-                    }
-                  }
-                }}
-              />
-
-              <Button type="submit" className="w-full h-11 text-base" disabled={!isNameValid}>
-                {t('gallery.enterGallery')}
-              </Button>
-            </form>
-          </div>
-
-          <p className="text-xs text-muted-foreground">{t('welcome.rememberName')}</p>
-        </div>
-      </div>
-    );
+    return <GuestNameForm />;
   }
 
   // For guest isolation mode, show loading state while fetching media
@@ -305,8 +204,8 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
             key={mediaItem.id}
             role="gridcell"
             className="after:content group relative mb-5 block w-full cursor-pointer after:pointer-events-none after:absolute after:inset-0 after:rounded-lg after:shadow-highlight focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background"
-            onClick={() => openMediaModal(index)}
-            onKeyDown={(e) => handleMediaKeyNavigation(e, index, openMediaModal)}
+            onClick={() => openModal(index)}
+            onKeyDown={(e) => handleMediaKeyNavigation(e, index, openModal)}
             onMouseEnter={() => prefetchMediaOnInteraction(mediaItem, 'full')}
             tabIndex={0}
             aria-label={
@@ -319,7 +218,7 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
             }
           >
             <StorageAwareMedia
-              {...getOptimizedMediaProps(mediaItem, 'gallery', { priority: index < 6 })}
+              {...getOptimizedMediaProps(mediaItem, 'gallery', { priority: index < 2 })}
               className="overflow-hidden transform rounded-lg brightness-90 transition will-change-auto group-hover:brightness-110 group-focus:brightness-110"
               style={{ transform: 'translate3d(0, 0, 0)' }}
             />

@@ -86,10 +86,6 @@
 @theme {
   --shadow-highlight: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
 
-  --breakpoint-narrow: (max-aspect-ratio: 3/2);
-  --breakpoint-wide: (min-aspect-ratio: 3/2);
-  --breakpoint-taller-than-854: (min-height: 854px);
-
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
@@ -232,6 +228,23 @@
   @supports (-webkit-touch-callout: none) {
     .ios-safari-bottom {
       padding-bottom: max(env(safe-area-inset-bottom, 0px), 20px);
+    }
+  }
+
+  /* Touch optimization for mobile - eliminates 300ms tap delay */
+  .touch-manipulation {
+    touch-action: manipulation;
+  }
+
+  /* Reduced motion support */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
     }
   }
 }

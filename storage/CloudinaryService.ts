@@ -1,6 +1,12 @@
 import { v2 as cloudinary } from 'cloudinary';
 import generateBlurPlaceholder from '../utils/generateBlurPlaceholder';
-import { StorageService, UploadResult, VideoUploadData, PresignedUploadResponse, VideoMetadata } from './StorageService';
+import {
+  StorageService,
+  UploadResult,
+  VideoUploadData,
+  PresignedUploadResponse,
+  VideoMetadata,
+} from './StorageService';
 import type { MediaProps } from '../utils/types';
 
 interface CloudinaryResource {
@@ -17,7 +23,7 @@ interface CloudinaryResource {
 
 /**
  * Cloudinary implementation of the StorageService interface.
- * 
+ *
  * Stores wedding photos in Cloudinary with organized folder structure:
  * - wedding/ (base folder)
  * - wedding/{guestName}/ (when guest isolation is used)
@@ -34,8 +40,20 @@ export class CloudinaryService implements StorageService {
   }
 
   /**
+   * Sanitizes a guest name for safe use in Cloudinary folder paths and search expressions.
+   * Matches the sanitization used by S3Service and LocalStorageService.
+   */
+  private sanitizeGuestName(guestName: string): string {
+    return guestName
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+  }
+
+  /**
    * Uploads a file to Cloudinary with guest-specific folder organization.
-   * 
+   *
    * @param file - The file to upload
    * @param guestName - Optional guest name for folder organization
    * @returns Promise that resolves to upload result with metadata
@@ -48,8 +66,9 @@ export class CloudinaryService implements StorageService {
       const dataURI = `data:${file.type};base64,${base64}`;
 
       // Always create guest-specific folders when guest name is provided
-      const folder = guestName 
-        ? `${this.baseFolder}/${guestName}` 
+      const sanitizedGuestName = guestName ? this.sanitizeGuestName(guestName) : undefined;
+      const folder = sanitizedGuestName
+        ? `${this.baseFolder}/${sanitizedGuestName}`
         : this.baseFolder;
 
       // Upload to Cloudinary with both folder structure AND context
@@ -78,7 +97,7 @@ export class CloudinaryService implements StorageService {
 
   /**
    * Lists all photos from Cloudinary with metadata.
-   * 
+   *
    * @param guestName - Optional guest name to filter photos
    * @returns Promise that resolves to an array of photo data with metadata
    */
@@ -87,8 +106,9 @@ export class CloudinaryService implements StorageService {
       // Build search expression based on guest filtering
       let expression = `folder:${this.baseFolder}/*`;
       if (guestName) {
-        // Search specifically in the guest's folder
-        expression = `folder:${this.baseFolder}/${guestName}/*`;
+        // Sanitize guest name before using in search expression
+        const sanitizedGuestName = this.sanitizeGuestName(guestName);
+        expression = `folder:${this.baseFolder}/${sanitizedGuestName}/*`;
       }
 
       // Search for images with context
@@ -102,7 +122,6 @@ export class CloudinaryService implements StorageService {
       // Transform to ImageProps format
       const transformedMedia: MediaProps[] = searchResults.resources.map(
         (resource: CloudinaryResource, index: number) => {
-          
           return {
             id: index,
             height: resource.height?.toString() || '480',
@@ -121,8 +140,8 @@ export class CloudinaryService implements StorageService {
         // Only generate blur for images
         if (mediaItem.resource_type === 'image') {
           // Find the original resource for this image
-          const originalResource = searchResults.resources.find((resource: CloudinaryResource) => 
-            resource.public_id === mediaItem.public_id
+          const originalResource = searchResults.resources.find(
+            (resource: CloudinaryResource) => resource.public_id === mediaItem.public_id
           );
           return generateBlurPlaceholder(originalResource);
         }
@@ -147,23 +166,30 @@ export class CloudinaryService implements StorageService {
 
   /**
    * Uploads a video file to Cloudinary.
-   * Note: Cloudinary has a 100MB limit for video uploads.
+   * Note: Cloudinary imposes a hard 100MB limit on video uploads regardless of our
+   * server-side MAX_VIDEO_SIZE (500MB). Users needing larger videos should use S3/Local storage.
    */
   async uploadVideo(buffer: Buffer, options: VideoUploadData): Promise<UploadResult> {
-    const MAX_VIDEO_SIZE = 100 * 1024 * 1024; // 100MB
-    
-    if (options.fileSize > MAX_VIDEO_SIZE) {
-      throw new Error(`Video file size (${Math.round(options.fileSize / 1024 / 1024)}MB) exceeds Cloudinary's 100MB limit. Please use a smaller file or switch to S3 storage.`);
+    const CLOUDINARY_VIDEO_LIMIT = 100 * 1024 * 1024; // Cloudinary's hard 100MB limit
+
+    if (options.fileSize > CLOUDINARY_VIDEO_LIMIT) {
+      throw new Error(
+        `Video file size (${Math.round(options.fileSize / 1024 / 1024)}MB) exceeds Cloudinary's 100MB limit. Please use a smaller file or switch to S3 storage.`
+      );
     }
 
     try {
+      const sanitizedGuestName = this.sanitizeGuestName(options.guestName);
+      // Use path-based naming consistent with S3/Local: {baseFolder}/{guest}/videos/{videoId}
+      const folder = `${this.baseFolder}/${sanitizedGuestName}/videos`;
       const result = await cloudinary.uploader.upload(
         `data:${options.fileType};base64,${buffer.toString('base64')}`,
         {
           resource_type: 'video',
-          folder: process.env.CLOUDINARY_FOLDER,
-          context: `guest=${options.guestName}`,
-          public_id: `${options.guestName}_${options.videoId}`,
+          folder,
+          // Store raw (unsanitized) guest name in context for display, matching image upload behavior
+          context: options.guestName ? { guest: options.guestName } : undefined,
+          public_id: options.videoId,
         }
       );
 
@@ -188,7 +214,9 @@ export class CloudinaryService implements StorageService {
    * This method throws an error to indicate videos should be uploaded via uploadVideo method.
    */
   async generateVideoUploadUrl(_options: VideoUploadData): Promise<PresignedUploadResponse> {
-    throw new Error('Cloudinary does not support presigned URLs. Use direct upload via uploadVideo method instead, or switch to S3 storage for presigned URL uploads.');
+    throw new Error(
+      'Cloudinary does not support presigned URLs. Use direct upload via uploadVideo method instead, or switch to S3 storage for presigned URL uploads.'
+    );
   }
 
   /**
@@ -198,7 +226,7 @@ export class CloudinaryService implements StorageService {
     try {
       // Extract public_id from Cloudinary URL
       const urlParts = publicUrl.split('/');
-      const uploadIndex = urlParts.findIndex(part => part === 'upload');
+      const uploadIndex = urlParts.findIndex((part) => part === 'upload');
       const publicIdWithExt = urlParts.slice(uploadIndex + 2).join('/');
       const publicId = publicIdWithExt.split('.')[0];
 

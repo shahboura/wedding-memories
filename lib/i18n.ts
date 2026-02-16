@@ -5,6 +5,7 @@ import { appConfig, Language } from '../config';
 // Import translation files
 import en from '../locales/en/common.json';
 import tr from '../locales/tr/common.json';
+import ms from '../locales/ms/common.json';
 
 const resources = {
   en: {
@@ -13,26 +14,27 @@ const resources = {
   tr: {
     common: tr,
   },
+  ms: {
+    common: ms,
+  },
 };
 
-i18n
-  .use(initReactI18next)
-  .init({
-    resources,
-    lng: appConfig.defaultLanguage,
-    fallbackLng: Language.English,
-    debug: process.env.NODE_ENV === 'development',
-    
-    interpolation: {
-      escapeValue: false, // React already does escaping
-    },
-    
-    defaultNS: 'common',
-    ns: ['common'],
-    
-    react: {
-      useSuspense: false,
-    },
-  });
+i18n.use(initReactI18next).init({
+  resources,
+  lng: appConfig.defaultLanguage,
+  fallbackLng: Language.English,
+  debug: process.env.NODE_ENV === 'development',
+
+  interpolation: {
+    escapeValue: false, // React already does escaping
+  },
+
+  defaultNS: 'common',
+  ns: ['common'],
+
+  react: {
+    useSuspense: false,
+  },
+});
 
 export default i18n;

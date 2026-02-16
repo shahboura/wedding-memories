@@ -17,11 +17,13 @@ import {
 const languageNames = {
   [Language.English]: 'English',
   [Language.Turkish]: 'Türkçe',
+  [Language.Malay]: 'Bahasa Melayu',
 };
 
 const languageFlags = {
   [Language.English]: '🇺🇸',
   [Language.Turkish]: '🇹🇷',
+  [Language.Malay]: '🇲🇾',
 };
 
 export function SettingsPanel() {
@@ -94,4 +96,3 @@ export function SettingsPanel() {
     </DropdownMenu>
   );
 }
-

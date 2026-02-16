@@ -54,8 +54,7 @@ export function AppLoader({ children, minLoadTime = 800 }: AppLoaderProps) {
           </div>
         </div>
       </div>
-      {/* Render children behind loader with reduced opacity */}
-      <div className="opacity-50">{children}</div>
+      {/* Don't render children during loading to avoid double render */}
     </>
   );
 }
