@@ -1,7 +1,7 @@
 # ============================================================
 # Stage 1: Install dependencies
 # ============================================================
-FROM node:22-alpine AS deps
+FROM node:25-alpine AS deps
 
 RUN corepack enable && corepack prepare pnpm@10.29.3 --activate
 
@@ -15,7 +15,7 @@ RUN pnpm install --frozen-lockfile --prod=false
 # ============================================================
 # Stage 2: Build the Next.js application
 # ============================================================
-FROM node:22-alpine AS builder
+FROM node:25-alpine AS builder
 
 # Install CA certificates for Turbopack to download Google Fonts over TLS
 # RUN apk add --no-cache ca-certificates
@@ -40,7 +40,7 @@ RUN pnpm build
 # ============================================================
 # Stage 3: Production runtime
 # ============================================================
-FROM node:22-alpine AS runner
+FROM node:25-alpine AS runner
 
 WORKDIR /app
 
