@@ -1,16 +1,17 @@
 services:
   wedding-memories:
     build: .
+    image: wedding-memories
     ports:
       - '${PORT:-3010}:3010'
     environment:
       # ---------------------------------------------------------------
       # Storage provider: "local" | "cloudinary" | "s3"
       # ---------------------------------------------------------------
-      - NEXT_PUBLIC_STORAGE_PROVIDER=${NEXT_PUBLIC_STORAGE_PROVIDER:-local}
+      - STORAGE_PROVIDER=${STORAGE_PROVIDER:-local}
 
       # ---------------------------------------------------------------
-      # Local storage (when NEXT_PUBLIC_STORAGE_PROVIDER=local)
+      # Local storage (when STORAGE_PROVIDER=local)
       # ---------------------------------------------------------------
       - LOCAL_STORAGE_PATH=/app/uploads
 
@@ -21,9 +22,10 @@ services:
       - GROOM_NAME=${GROOM_NAME:-Groom}
       - GUEST_ISOLATION=${GUEST_ISOLATION:-true}
       - DEFAULT_LANGUAGE=${DEFAULT_LANGUAGE:-en}
+      - WHATSAPP_NUMBER=${WHATSAPP_NUMBER:-}
 
       # ---------------------------------------------------------------
-      # Cloudinary (when NEXT_PUBLIC_STORAGE_PROVIDER=cloudinary)
+      # Cloudinary (when STORAGE_PROVIDER=cloudinary)
       # ---------------------------------------------------------------
       - NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=${NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME:-}
       - CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY:-}
@@ -31,7 +33,7 @@ services:
       - CLOUDINARY_FOLDER=${CLOUDINARY_FOLDER:-wedding}
 
       # ---------------------------------------------------------------
-      # S3 / Wasabi (when NEXT_PUBLIC_STORAGE_PROVIDER=s3)
+      # S3 / Wasabi (when STORAGE_PROVIDER=s3)
       # ---------------------------------------------------------------
       - AWS_REGION=${AWS_REGION:-}
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
@@ -40,9 +42,15 @@ services:
       - NEXT_PUBLIC_S3_ENDPOINT=${NEXT_PUBLIC_S3_ENDPOINT:-}
     volumes:
       # Persist uploaded media across container restarts.
-      # Only used when NEXT_PUBLIC_STORAGE_PROVIDER=local.
+      # Only used when STORAGE_PROVIDER=local.
       - wedding-uploads:/app/uploads
     restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '-q', 'http://localhost:3010/api/photos']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
 volumes:
   wedding-uploads:

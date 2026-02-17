@@ -11,14 +11,11 @@ export enum Language {
 }
 
 /**
- * Resolves the storage provider from the NEXT_PUBLIC_STORAGE_PROVIDER env var,
+ * Resolves the storage provider from the STORAGE_PROVIDER env var,
  * falling back to the hardcoded default.
- *
- * Uses NEXT_PUBLIC_ prefix so the value is available on both server and client
- * (Next.js inlines NEXT_PUBLIC_ env vars at build time for client bundles).
  */
 function resolveStorageProvider(): StorageProvider {
-  const envValue = process.env.NEXT_PUBLIC_STORAGE_PROVIDER?.toLowerCase();
+  const envValue = process.env.STORAGE_PROVIDER?.toLowerCase();
   if (envValue === 'local') return StorageProvider.Local;
   if (envValue === 's3') return StorageProvider.S3;
   if (envValue === 'cloudinary') return StorageProvider.Cloudinary;
@@ -31,5 +28,6 @@ export const appConfig = {
   guestIsolation: process.env.GUEST_ISOLATION !== 'false',
   storage: resolveStorageProvider(),
   defaultLanguage: (process.env.DEFAULT_LANGUAGE as Language) || Language.English,
-  supportedLanguages: [Language.English, Language.Turkish, Language.Malay],
+  supportedLanguages: [Language.English, Language.Malay],
+  whatsappNumber: process.env.WHATSAPP_NUMBER || '',
 };

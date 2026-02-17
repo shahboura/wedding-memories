@@ -1,6 +1,5 @@
 'use client';
 
-import React from 'react';
 import { Button } from './ui/button';
 import {
   DropdownMenu,
@@ -20,7 +19,7 @@ interface LanguageSwitcherProps {
 const languageNames = {
   [Language.English]: 'English',
   [Language.Turkish]: 'Türkçe',
-  [Language.Malay]: 'Bahasa Melayu',
+  [Language.Malay]: 'Melayu',
 };
 
 const languageFlags = {

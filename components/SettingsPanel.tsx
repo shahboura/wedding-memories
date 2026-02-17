@@ -17,7 +17,7 @@ import {
 const languageNames = {
   [Language.English]: 'English',
   [Language.Turkish]: 'Türkçe',
-  [Language.Malay]: 'Bahasa Melayu',
+  [Language.Malay]: 'Melayu',
 };
 
 const languageFlags = {

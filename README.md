@@ -103,7 +103,7 @@ export const appConfig = {
   brideName: 'YourBrideName', // or set BRIDE_NAME env var
   groomName: 'YourGroomName', // or set GROOM_NAME env var
   guestIsolation: false, // or set GUEST_ISOLATION env var
-  storage: StorageProvider.Cloudinary, // or set NEXT_PUBLIC_STORAGE_PROVIDER env var
+  storage: StorageProvider.Cloudinary, // or set STORAGE_PROVIDER env var
 };
 ```
 
@@ -112,7 +112,7 @@ export const appConfig = {
 - **Local**: Filesystem storage with no cloud dependencies — ideal for Docker / self-hosted deployments
 - **Cloudinary**: Cloud-based media storage with automatic optimization, transformations, and blur placeholders for images/videos
 - **S3/Wasabi**: Object storage compatible with AWS S3 API via secure proxy with request deduplication and stream handling
-- **Seamless Switching**: Change providers via `NEXT_PUBLIC_STORAGE_PROVIDER` env var or `config.ts` — no code changes required
+- **Seamless Switching**: Change providers via `STORAGE_PROVIDER` env var or `config.ts` — no code changes required
 - **Smart Media Handling**: Automatic optimization for Cloudinary, proxy-based serving for S3/Wasabi with progressive video loading
 - **Feature Parity**: Download, external links, and all functionality work identically across providers
 
@@ -162,7 +162,7 @@ export const appConfig = {
 ├── locales/              # i18n translation files
 │   ├── en/               # English
 │   ├── tr/               # Turkish
-│   └── ms/               # Malay (Bahasa Melayu)
+│   └── ms/               # Malay (Melayu)
 ├── utils/                # Utilities and helpers
 │   ├── types.ts          # TypeScript interfaces for media data
 │   ├── validation.ts     # Input validation utilities with security focus
@@ -211,7 +211,7 @@ Deploy to [Vercel](https://vercel.com/new/clone) (recommended), Docker, or any p
    docker compose -f docker-compose.yml -f docker-compose.dev.yml up
    ```
 
-   - Uses `NEXT_PUBLIC_STORAGE_PROVIDER=local` by default — no cloud credentials needed
+   - Uses `STORAGE_PROVIDER=local` by default — no cloud credentials needed
    - Uploaded media persists in a Docker named volume (`wedding-uploads`)
    - Set `BRIDE_NAME`, `GROOM_NAME`, `DEFAULT_LANGUAGE`, etc. in `.env`
    - See `.env.docker.example` for all available options
