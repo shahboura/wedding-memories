@@ -4,15 +4,11 @@ import { appConfig, Language } from '../config';
 
 // Import translation files
 import en from '../locales/en/common.json';
-import tr from '../locales/tr/common.json';
 import ms from '../locales/ms/common.json';
 
 const resources = {
   en: {
     common: en,
-  },
-  tr: {
-    common: tr,
   },
   ms: {
     common: ms,

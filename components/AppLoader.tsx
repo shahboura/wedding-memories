@@ -45,7 +45,7 @@ export function AppLoader({ children, minLoadTime = 800 }: AppLoaderProps) {
         )}
       >
         <div className="flex flex-col items-center space-y-4">
-          <Spinner size="lg" className="text-foreground" />
+          <Spinner size="lg" className="text-foreground" label={t('common.loading')} />
           <div className="text-center">
             <h2 className="text-xl font-semibold text-foreground">
               {appConfig.brideName} & {appConfig.groomName} {t('common.weddingMemories')}

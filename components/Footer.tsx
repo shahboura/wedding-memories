@@ -1,7 +1,11 @@
+'use client';
+
 import { MessageCircle } from 'lucide-react';
 import { appConfig } from '../config';
+import { useI18n } from './I18nProvider';
 
 export const Footer = () => {
+  const { t } = useI18n();
   const whatsappNumber = appConfig.whatsappNumber;
   const whatsappLink = whatsappNumber ? `https://wa.me/${whatsappNumber.replace(/\D/g, '')}` : null;
 
@@ -15,7 +19,7 @@ export const Footer = () => {
             rel="noopener noreferrer"
             className="flex items-center gap-2 hover:text-primary transition-colors duration-200"
           >
-            Having problem? Upload
+            {t('footer.havingProblem')}
             <MessageCircle className="w-4 h-4" />
             <span>{whatsappNumber}</span>
           </a>

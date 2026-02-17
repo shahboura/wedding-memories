@@ -51,8 +51,8 @@
     "managingFiles": "Mengurus {{count}} Fail",
     "selectedFiles": "Fail Dipilih ({{count}})",
     "filesSuccessfullyAdded": "Fail Berjaya Ditambah!",
-    "filesAddedToGallery": "{{count}} fail telah ditambah ke galeri perkahwinan. Gunakan butang \"Lihat Galeri\" di bawah untuk melihat fail anda.",
-    "filesAddedToGallery_plural": "{{count}} fail telah ditambah ke galeri perkahwinan. Gunakan butang \"Lihat Galeri\" di bawah untuk melihat fail anda.",
+    "filesAddedToGallery": "{{count}} fail telah ditambah ke galeri perkahwinan.",
+    "filesAddedToGallery_plural": "{{count}} fail telah ditambah ke galeri perkahwinan.",
     "viewGallery": "Lihat Galeri"
   },
   "welcome": {
@@ -158,5 +158,21 @@
     "video": "video",
     "videos": "video",
     "close": "Tutup"
+  },
+  "settings": {
+    "title": "Tetapan",
+    "language": "Bahasa",
+    "theme": "Tema",
+    "light": "Cerah",
+    "dark": "Gelap",
+    "system": "Sistem"
+  },
+  "footer": {
+    "havingProblem": "Ada masalah? Muat naik"
+  },
+  "notFound": {
+    "title": "404 - Halaman Tidak Dijumpai",
+    "description": "Halaman yang anda cari tidak wujud.",
+    "goHome": "Ke Halaman Utama"
   }
 }

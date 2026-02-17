@@ -51,8 +51,8 @@
     "managingFiles": "Managing {{count}} Files",
     "selectedFiles": "Selected Files ({{count}})",
     "filesSuccessfullyAdded": "Files Successfully Added!",
-    "filesAddedToGallery": "{{count}} file has been added to the wedding gallery. Use the \"View Gallery\" button below to see your files.",
-    "filesAddedToGallery_plural": "{{count}} files have been added to the wedding gallery. Use the \"View Gallery\" button below to see your files.",
+    "filesAddedToGallery": "{{count}} file has been added to the wedding gallery.",
+    "filesAddedToGallery_plural": "{{count}} files have been added to the wedding gallery.",
     "viewGallery": "View Gallery"
   },
   "welcome": {
@@ -158,5 +158,21 @@
     "video": "video",
     "videos": "videos",
     "close": "Close"
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "theme": "Theme",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System"
+  },
+  "footer": {
+    "havingProblem": "Having problem? Upload"
+  },
+  "notFound": {
+    "title": "404 - Page Not Found",
+    "description": "The page you're looking for doesn't exist.",
+    "goHome": "Go Home"
   }
 }

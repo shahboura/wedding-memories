@@ -6,7 +6,6 @@ export enum StorageProvider {
 
 export enum Language {
   English = 'en',
-  Turkish = 'tr',
   Malay = 'ms',
 }
 

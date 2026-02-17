@@ -3,14 +3,17 @@ import { cn } from '@/lib/utils';
 
 interface SpinnerProps extends HTMLAttributes<HTMLDivElement> {
   size?: 'sm' | 'md' | 'lg';
+  label?: string;
 }
 
-function Spinner({ className, size = 'md', ...props }: SpinnerProps) {
+function Spinner({ className, size = 'md', label, ...props }: SpinnerProps) {
   const sizeClasses = {
     sm: 'h-4 w-4 border-2',
     md: 'h-6 w-6 border-2',
     lg: 'h-8 w-8 border-3',
   };
+
+  const accessibleLabel = label ?? 'Loading...';
 
   return (
     <div
@@ -20,10 +23,10 @@ function Spinner({ className, size = 'md', ...props }: SpinnerProps) {
         className
       )}
       role="status"
-      aria-label="loading"
+      aria-label={accessibleLabel}
       {...props}
     >
-      <span className="sr-only">Loading...</span>
+      <span className="sr-only">{accessibleLabel}</span>
     </div>
   );
 }

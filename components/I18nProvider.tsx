@@ -30,6 +30,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
 
         await i18n.changeLanguage(initialLanguage);
         setLanguageState(initialLanguage);
+        document.documentElement.lang = initialLanguage;
         setIsLoading(false);
       } catch (error) {
         console.warn('Failed to initialize language:', error);
@@ -45,6 +46,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
       await i18n.changeLanguage(newLanguage);
       setLanguageState(newLanguage);
       setRenderKey((k) => k + 1);
+      document.documentElement.lang = newLanguage;
       localStorage.setItem('wedding-app-language', newLanguage);
     } catch (error) {
       console.error('Failed to change language:', error);
