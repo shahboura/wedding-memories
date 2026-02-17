@@ -124,7 +124,6 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
   const [fileToDelete, setFileToDelete] = useState<string | null>(null);
   const [isEditingName, setIsEditingName] = useState(false);
   const [isEditingNameMobile, setIsEditingNameMobile] = useState(false);
-  const [isUpdatingName, setIsUpdatingName] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
   const [currentNameValue, setCurrentNameValue] = useState('');
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -723,7 +722,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
     });
   };
 
-  const handleNameChange = async () => {
+  const handleNameChange = () => {
     const rawValue = currentNameValue;
     // Final validation before submitting
     const error = validateName(rawValue);
@@ -732,11 +731,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
       return;
     }
 
-    setIsUpdatingName(true);
     setNameError(null);
-
-    // Add a small delay to show loading state (simulates processing)
-    await new Promise((resolve) => setTimeout(resolve, 800));
 
     // Use validated and sanitized name
     const sanitizedName = validateGuestName(rawValue, t);
@@ -747,7 +742,6 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
     nameInputRef.current?.blur();
     setIsEditingName(false);
     setIsEditingNameMobile(false);
-    setIsUpdatingName(false);
   };
 
   // Real-time validation handler
@@ -921,7 +915,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
             </div>
 
             {/* Compact grid layout for files - stable layout */}
-            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2 flex-1 min-h-0 overflow-y-auto p-1 custom-scrollbar">
+            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2 content-start flex-1 min-h-0 overflow-y-auto p-1 custom-scrollbar">
               {files.map((uploadFile) => (
                 <div
                   key={uploadFile.id}
@@ -1229,14 +1223,12 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
         <Dialog
           open={isEditingName}
           onOpenChange={(open) => {
-            if (!isUpdatingName) {
-              setIsEditingName(open);
-              if (open) {
-                setCurrentNameValue(guestName || '');
-                setNameError(null);
-              } else {
-                setNameError(null);
-              }
+            setIsEditingName(open);
+            if (open) {
+              setCurrentNameValue(guestName || '');
+              setNameError(null);
+            } else {
+              setNameError(null);
             }
           }}
         >
@@ -1253,11 +1245,8 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
                   placeholder={t('nameDialog.placeholder')}
                   value={currentNameValue}
                   autoFocus
-                  disabled={isUpdatingName}
                   onChange={handleNameInput}
                   onKeyDown={(e) => {
-                    if (isUpdatingName) return;
-
                     if (e.key === 'Enter') {
                       e.preventDefault();
                       if (!nameError) {
@@ -1285,22 +1274,19 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
               <Button
                 variant="outline"
                 onClick={() => {
-                  if (!isUpdatingName) {
-                    nameInputRef.current?.blur();
-                    setIsEditingName(false);
-                  }
+                  nameInputRef.current?.blur();
+                  setIsEditingName(false);
                 }}
                 className="w-full sm:w-auto order-2 sm:order-1"
-                disabled={isUpdatingName}
               >
                 {t('upload.cancel')}
               </Button>
               <Button
                 onClick={handleNameChange}
                 className="w-full sm:w-auto order-1 sm:order-2"
-                disabled={isUpdatingName || !!nameError}
+                disabled={!!nameError}
               >
-                {isUpdatingName ? t('nameDialog.updating') : t('nameDialog.updateName')}
+                {t('nameDialog.updateName')}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -1350,10 +1336,8 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
                         placeholder={t('nameDialog.placeholder')}
                         value={currentNameValue}
                         autoFocus
-                        disabled={isUpdatingName}
                         onChange={handleNameInput}
                         onKeyDown={(e) => {
-                          if (isUpdatingName) return;
                           if (e.key === 'Enter') {
                             e.preventDefault();
                             if (!nameError) {
@@ -1381,7 +1365,6 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
                           setIsEditingNameMobile(false);
                           setNameError(null);
                         }}
-                        disabled={isUpdatingName}
                         aria-label={t('upload.cancel')}
                       >
                         <X className="w-4 h-4" />
@@ -1391,7 +1374,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
                         size="icon"
                         className="h-9 w-9 shrink-0 text-primary hover:text-primary/80"
                         onClick={handleNameChange}
-                        disabled={isUpdatingName || !!nameError}
+                        disabled={!!nameError}
                         aria-label={t('nameDialog.updateName')}
                       >
                         <Check className="w-4 h-4" />

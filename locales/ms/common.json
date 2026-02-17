@@ -65,10 +65,8 @@
   "nameDialog": {
     "title": "Tukar Nama Anda",
     "description": "Kemaskini nama yang akan dikaitkan dengan fail yang anda muat naik.",
-    "descriptionMobile": "Kemaskini nama yang akan dikaitkan dengan gambar anda.",
     "placeholder": "Masukkan nama anda",
     "updateName": "Kemaskini Nama",
-    "updating": "Mengemaskini...",
     "edit": "Sunting"
   },
   "confirmDialog": {

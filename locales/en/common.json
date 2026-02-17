@@ -65,10 +65,8 @@
   "nameDialog": {
     "title": "Change Your Name",
     "description": "Update the name that will be associated with your uploaded files.",
-    "descriptionMobile": "Update the name that will be associated with your photos.",
     "placeholder": "Enter your name",
     "updateName": "Update Name",
-    "updating": "Updating...",
     "edit": "Edit"
   },
   "confirmDialog": {
