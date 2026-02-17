@@ -122,6 +122,7 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
   }, [zoom, controlsVisible]);
 
   // Prevent browser zoom on the document when modal is open
+  // Use position:fixed scroll lock to prevent iOS Safari rubber-banding
   useEffect(() => {
     if (isOpen) {
       const preventDefault = (e: Event) => {
@@ -130,12 +131,26 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
         }
       };
 
+      // Save current scroll position and lock body
+      const scrollY = window.scrollY;
+      const body = document.body;
+      body.style.position = 'fixed';
+      body.style.top = `-${scrollY}px`;
+      body.style.left = '0';
+      body.style.right = '0';
+      body.style.overflow = 'hidden';
+
       document.addEventListener('touchstart', preventDefault, { passive: false });
-      document.body.style.overflow = 'hidden';
 
       return () => {
         document.removeEventListener('touchstart', preventDefault);
-        document.body.style.overflow = '';
+        // Restore scroll position
+        body.style.position = '';
+        body.style.top = '';
+        body.style.left = '';
+        body.style.right = '';
+        body.style.overflow = '';
+        window.scrollTo(0, scrollY);
       };
     }
   }, [isOpen]);
@@ -457,6 +472,7 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
                         onClick={onClose}
                         className="rounded-full p-3 text-white/75 transition hover:bg-black/50 hover:text-white"
                         title={t('modal.closeModal')}
+                        aria-label={t('modal.closeModal')}
                       >
                         <X className="h-5 w-5" />
                       </button>
@@ -475,6 +491,7 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
                           className="rounded-full p-3 text-white/75 transition hover:bg-black/50 hover:text-white"
                           target="_blank"
                           title={t('modal.openFullsize')}
+                          aria-label={t('modal.openFullsize')}
                           rel="noreferrer"
                         >
                           <ExternalLink className="h-5 w-5" />
@@ -495,6 +512,7 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
                           }}
                           className="rounded-full p-3 text-white/75 transition hover:bg-black/50 hover:text-white"
                           title={t('modal.downloadFullsize')}
+                          aria-label={t('modal.downloadFullsize')}
                         >
                           <Download className="h-5 w-5" />
                         </button>
@@ -507,6 +525,7 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
                             disabled={zoom <= 0.5}
                             className="rounded-full p-3 text-white/75 transition hover:bg-black/50 hover:text-white disabled:opacity-50"
                             title={t('modal.zoomOut')}
+                            aria-label={t('modal.zoomOut')}
                           >
                             <ZoomOut className="h-5 w-5" />
                           </button>
@@ -518,6 +537,7 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
                             disabled={zoom >= 5}
                             className="rounded-full p-3 text-white/75 transition hover:bg-black/50 hover:text-white disabled:opacity-50"
                             title={t('modal.zoomIn')}
+                            aria-label={t('modal.zoomIn')}
                           >
                             <ZoomIn className="h-5 w-5" />
                           </button>
@@ -526,6 +546,7 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
                               onClick={resetZoom}
                               className="rounded-full p-3 text-white/75 transition hover:bg-black/50 hover:text-white ml-0.5"
                               title={t('modal.resetZoom')}
+                              aria-label={t('modal.resetZoom')}
                             >
                               <RotateCcw className="h-5 w-5" />
                             </button>
@@ -540,6 +561,7 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
                       onClick={() => changeMediaIndex(currentIndex - 1)}
                       className="absolute left-2 top-1/2 -translate-y-1/2 z-10 rounded-full bg-black/50 p-2 text-white/75 backdrop-blur-lg transition hover:bg-black/75 hover:text-white"
                       title={t('modal.previousMedia')}
+                      aria-label={t('modal.previousMedia')}
                     >
                       <ChevronLeft className="h-6 w-6" />
                     </button>
@@ -553,6 +575,7 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
                         onClick={() => changeMediaIndex(currentIndex + 1)}
                         className="absolute right-2 top-1/2 -translate-y-1/2 z-10 rounded-full bg-black/50 p-2 text-white/75 backdrop-blur-lg transition hover:bg-black/75 hover:text-white"
                         title={t('modal.nextMedia')}
+                        aria-label={t('modal.nextMedia')}
                       >
                         <ChevronRight className="h-6 w-6" />
                       </button>

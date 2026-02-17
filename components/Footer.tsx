@@ -17,7 +17,7 @@ export const Footer = () => {
             href={whatsappLink}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 hover:text-primary transition-colors duration-200"
+            className="flex items-center gap-2 py-3 hover:text-primary transition-colors duration-200"
           >
             {t('footer.havingProblem')}
             <MessageCircle className="w-4 h-4" />

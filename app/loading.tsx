@@ -24,7 +24,7 @@ export default function Loading() {
         </header>
 
         <div className="columns-1 gap-5 sm:columns-2 xl:columns-3 2xl:columns-4">
-          {Array.from({ length: 16 }).map((_, i) => {
+          {Array.from({ length: 6 }).map((_, i) => {
             const aspectRatios = [
               { w: 720, h: 480 },
               { w: 720, h: 540 },
@@ -40,12 +40,8 @@ export default function Loading() {
             const height = Math.round((ratio.h / ratio.w) * 300);
 
             return (
-              <div key={i} className="relative mb-5 block w-full overflow-hidden group">
-                <Skeleton
-                  className="w-full rounded-lg transition-all duration-200 hover:brightness-110"
-                  style={{ height: `${height}px` }}
-                />
-                <div className="absolute inset-0 rounded-lg shadow-highlight pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+              <div key={i} className="relative mb-5 block w-full overflow-hidden">
+                <Skeleton className="w-full rounded-lg" style={{ height: `${height}px` }} />
               </div>
             );
           })}

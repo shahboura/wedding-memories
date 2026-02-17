@@ -74,6 +74,8 @@ export const GuestNameInput = forwardRef<HTMLInputElement, GuestNameInputProps>(
           onKeyDown={onKeyDown}
           autoFocus={autoFocus}
           disabled={disabled}
+          autoComplete="name"
+          enterKeyHint="done"
           className={`${className} ${error ? 'border-destructive focus:border-destructive' : ''}`}
         />
         <div className="h-6 flex items-center">
