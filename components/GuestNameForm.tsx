@@ -43,7 +43,8 @@ export function GuestNameForm() {
       toast({
         variant: 'destructive',
         title: t('errors.validationError'),
-        description: error instanceof Error ? error.message : t('errors.validationErrorDescription'),
+        description:
+          error instanceof Error ? error.message : t('errors.validationErrorDescription'),
       });
     }
   };
@@ -59,19 +60,21 @@ export function GuestNameForm() {
           </h1>
           <p className="text-muted-foreground">{t('gallery.weddingMemories')}</p>
         </div>
-        
+
         <div className="bg-card rounded-lg border p-6 shadow-sm">
-          <h2 className="text-xl font-semibold mb-2">{t('gallery.welcome', { 
-            brideName: appConfig.brideName, 
-            groomName: appConfig.groomName 
-          })}</h2>
+          <h2 className="text-xl font-semibold mb-2">
+            {t('gallery.welcome', {
+              brideName: appConfig.brideName,
+              groomName: appConfig.groomName,
+            })}
+          </h2>
           <p className="text-muted-foreground mb-6">
-            {t('gallery.enterNamePrompt', { 
-              brideName: appConfig.brideName, 
-              groomName: appConfig.groomName 
+            {t('gallery.enterNamePrompt', {
+              brideName: appConfig.brideName,
+              groomName: appConfig.groomName,
             })}
           </p>
-          
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <GuestNameInput
               value={name}
@@ -81,6 +84,7 @@ export function GuestNameForm() {
               className="text-center text-lg h-12"
               autoFocus
               t={t}
+              enterKeyHint="go"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
@@ -90,20 +94,14 @@ export function GuestNameForm() {
                 }
               }}
             />
-            
-            <Button 
-              type="submit" 
-              className="w-full h-11 text-base"
-              disabled={!isNameValid}
-            >
+
+            <Button type="submit" className="w-full h-11 text-base" disabled={!isNameValid}>
               {t('gallery.enterGallery')}
             </Button>
           </form>
         </div>
-        
-        <p className="text-xs text-muted-foreground">
-          {t('welcome.rememberName')}
-        </p>
+
+        <p className="text-xs text-muted-foreground">{t('welcome.rememberName')}</p>
       </div>
     </div>
   );

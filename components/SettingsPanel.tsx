@@ -33,7 +33,7 @@ export function SettingsPanel() {
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
-          size="sm"
+          size="icon"
           className="h-11 w-11 px-0 rounded hover:bg-muted/50 transition-colors"
         >
           <Settings className="h-4 w-4" />

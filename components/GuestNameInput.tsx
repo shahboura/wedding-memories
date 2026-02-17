@@ -13,6 +13,7 @@ interface GuestNameInputProps {
   autoFocus?: boolean;
   disabled?: boolean;
   onKeyDown?: (e: React.KeyboardEvent) => void;
+  enterKeyHint?: 'done' | 'go' | 'send' | 'search' | 'next' | 'enter';
   t?: (key: string, options?: Record<string, string | number>) => string;
 }
 
@@ -37,6 +38,7 @@ export const GuestNameInput = forwardRef<HTMLInputElement, GuestNameInputProps>(
       autoFocus = false,
       disabled = false,
       onKeyDown,
+      enterKeyHint = 'done',
       t,
     },
     ref
@@ -75,7 +77,7 @@ export const GuestNameInput = forwardRef<HTMLInputElement, GuestNameInputProps>(
           autoFocus={autoFocus}
           disabled={disabled}
           autoComplete="name"
-          enterKeyHint="done"
+          enterKeyHint={enterKeyHint}
           className={`${className} ${error ? 'border-destructive focus:border-destructive' : ''}`}
         />
         <div className="h-6 flex items-center">
