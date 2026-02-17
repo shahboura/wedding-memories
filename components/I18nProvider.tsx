@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import i18n from '../lib/i18n';
 import { appConfig, Language } from '../config';
 
@@ -16,8 +16,6 @@ const I18nContext = createContext<I18nContextType | undefined>(undefined);
 export function I18nProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguageState] = useState<Language>(appConfig.defaultLanguage);
   const [isLoading, setIsLoading] = useState(true);
-  // Counter to force re-render after language change so t() reads fresh values
-  const [, setRenderKey] = useState(0);
 
   useEffect(() => {
     const initializeLanguage = async () => {
@@ -41,28 +39,31 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     initializeLanguage();
   }, []);
 
-  const setLanguage = async (newLanguage: Language) => {
+  const setLanguage = useCallback(async (newLanguage: Language) => {
     try {
       await i18n.changeLanguage(newLanguage);
       setLanguageState(newLanguage);
-      setRenderKey((k) => k + 1);
       document.documentElement.lang = newLanguage;
       localStorage.setItem('wedding-app-language', newLanguage);
     } catch (error) {
       console.error('Failed to change language:', error);
     }
-  };
+  }, []);
 
-  // Read t directly from the i18n singleton — always returns the current language
-  const t = (key: string, options?: Record<string, unknown>): string =>
-    i18n.t(key, options) as string;
+  // Memoize t so consumers don't re-render unless the language actually changes.
+  // language is intentionally in deps — i18n.t reads from the singleton, but we need
+  // a new function reference when language changes to trigger consumer re-renders.
+  /* eslint-disable react-hooks/exhaustive-deps */
+  const t = useCallback(
+    (key: string, options?: Record<string, unknown>): string => i18n.t(key, options) as string,
+    [language]
+  );
+  /* eslint-enable react-hooks/exhaustive-deps */
 
-  const contextValue: I18nContextType = {
-    language,
-    setLanguage,
-    t,
-    isLoading,
-  };
+  const contextValue = useMemo<I18nContextType>(
+    () => ({ language, setLanguage, t, isLoading }),
+    [language, setLanguage, t, isLoading]
+  );
 
   return <I18nContext.Provider value={contextValue}>{children}</I18nContext.Provider>;
 }

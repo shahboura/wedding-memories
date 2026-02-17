@@ -1,7 +1,11 @@
 'use client';
 
 import React from 'react';
-import { Upload } from './Upload';
+import dynamic from 'next/dynamic';
+
+const Upload = dynamic(() => import('./Upload').then((m) => ({ default: m.Upload })), {
+  ssr: false,
+});
 import { Header } from './Header';
 import { Footer } from './Footer';
 

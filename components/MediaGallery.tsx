@@ -90,11 +90,7 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
           url += `?guest=${encodeURIComponent(guestToUse)}`;
         }
 
-        const response = await fetch(url, {
-          headers: {
-            'Cache-Control': 'no-cache',
-          },
-        });
+        const response = await fetch(url);
 
         if (response.ok) {
           const refreshedMedia = await response.json();
