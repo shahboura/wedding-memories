@@ -71,27 +71,6 @@ export function SettingsPanel() {
           System
           {theme === 'system' && <span className="ml-auto">✓</span>}
         </DropdownMenuItem>
-
-        <DropdownMenuSeparator />
-
-        <div className="px-2 py-2 text-center space-y-1">
-          <a
-            href="https://www.onurgumus.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block text-xs text-muted-foreground hover:text-primary transition-colors duration-200"
-          >
-            onurgumus.com
-          </a>
-          <a
-            href="https://github.com/gumusonur/wedding-memories"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block text-xs text-foreground hover:text-primary transition-colors duration-200"
-          >
-            View on GitHub
-          </a>
-        </div>
       </DropdownMenuContent>
     </DropdownMenu>
   );
