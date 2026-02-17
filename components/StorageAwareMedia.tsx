@@ -81,9 +81,11 @@ export function StorageAwareMedia({
   });
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [loadError, setLoadError] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [isDesktop, setIsDesktop] = useState(true);
+  const [hasFrame, setHasFrame] = useState(false);
   const isGalleryView = context === 'gallery' ? !controls : false;
 
   useEffect(() => {
@@ -92,6 +94,33 @@ export function StorageAwareMedia({
     setIsMobile(mobile);
     setIsDesktop(desktop);
   }, []);
+
+  // Intersection Observer: lazily upgrade preload when video scrolls into view.
+  // This avoids downloading metadata for off-screen videos on mobile data.
+  useEffect(() => {
+    if (resource_type !== 'video' || context === 'modal') return;
+
+    // Reset frame state when src changes (e.g., gallery refetch assigns new URL)
+    setHasFrame(false);
+
+    const container = containerRef.current;
+    const video = videoRef.current;
+    if (!container || !video) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && video.preload === 'none') {
+          video.preload = 'metadata';
+          video.load();
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '200px' }
+    );
+
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [resource_type, context, src]);
 
   useEffect(() => {
     if (resource_type !== 'video') return;
@@ -185,6 +214,7 @@ export function StorageAwareMedia({
     // Use regular video element
     return (
       <div
+        ref={containerRef}
         className="relative group w-full h-full"
         onClick={onClick}
         onMouseEnter={() => {
@@ -224,8 +254,17 @@ export function StorageAwareMedia({
           </div>
         )}
 
-        {/* Play overlay for gallery view */}
-        {context === 'gallery' && !controls && !isLoading && !loadError && (
+        {/* Video placeholder: gradient + icon shown until first frame is extracted */}
+        {!hasFrame && !loadError && context !== 'modal' && (
+          <div className="absolute inset-0 bg-gradient-to-br from-gray-700 to-gray-900 rounded-lg flex items-center justify-center">
+            <div className="bg-white/10 rounded-full p-3 backdrop-blur-sm">
+              <Play className="text-white/70 w-6 h-6" fill="white" fillOpacity={0.5} />
+            </div>
+          </div>
+        )}
+
+        {/* Play overlay for gallery view - only shown after first frame is visible */}
+        {context === 'gallery' && !controls && hasFrame && !isLoading && !loadError && (
           <div
             className="absolute inset-0 bg-black/20 group-hover:bg-black/30 transition-colors duration-200 rounded-lg flex items-center justify-center overflow-hidden"
             onClick={(e) => {
@@ -279,14 +318,19 @@ export function StorageAwareMedia({
           draggable={draggable}
           playsInline
           muted={isGalleryView}
-          preload={
-            context === 'thumb' ? 'metadata' : context === 'gallery' && isMobile ? 'none' : 'auto'
-          }
+          preload={context === 'modal' ? 'auto' : 'none'}
           disablePictureInPicture={isMobile}
           onLoadedMetadata={() => {
-            // Force show first frame on mobile for thumbnails
-            if (isMobile && context === 'thumb' && videoRef.current) {
+            // Force show first frame so the browser renders a visible poster
+            // instead of a black rectangle (not all browsers do this automatically)
+            if (context !== 'modal' && videoRef.current && videoRef.current.currentTime === 0) {
               videoRef.current.currentTime = 0.1;
+            }
+          }}
+          onSeeked={() => {
+            // First frame has been rendered — hide the placeholder overlay
+            if (context !== 'modal') {
+              setHasFrame(true);
             }
           }}
         />
