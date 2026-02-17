@@ -38,6 +38,8 @@
     "filesSelected": "{{count}} file selected",
     "filesSelected_plural": "{{count}} files selected",
     "clearCompleted": "Clear Completed",
+    "countSelected": "{{count}} selected",
+    "countFiles": "{{count}} files",
     "addCount": "Add {{count}} File",
     "addCount_plural": "Add {{count}} Files",
     "adding": "Adding... ({{count}})",

@@ -148,10 +148,6 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
     filesRef.current = files;
   }, [files]);
 
-  const validateName = (name: string): string | null => {
-    return validateGuestNameForUI(name, t);
-  };
-
   useEffect(() => {
     if (currentGuestName && currentGuestName !== guestName) {
       setGuestName(currentGuestName);
@@ -224,7 +220,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
 
           const video = document.createElement('video');
           video.muted = true;
-          video.playsInline = true; // iOS için önemli
+          video.playsInline = true; // Required for iOS inline playback
           video.preload = 'metadata';
 
           const cleanup = () => {
@@ -299,12 +295,12 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
           return;
         }
 
-        // Resim dosyaları için - iOS'te daha güvenli yaklaşım
+        // Image files — safer approach for iOS
 
-        // iOS'te büyük resimler için FileReader sorunlu olabiliyor
-        // Object URL her durumda daha güvenli
+        // Large images can be problematic with FileReader on iOS
+        // Object URL is safer in all cases
         if (isMobile || file.size > 5 * 1024 * 1024) {
-          // 5MB üzeri dosyalar için
+          // Files over 5MB
           try {
             const objectUrl = URL.createObjectURL(file);
             resolve(objectUrl);
@@ -314,7 +310,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
           return;
         }
 
-        // Desktop ve küçük dosyalar için FileReader
+        // Desktop small files — use FileReader
         const reader = new FileReader();
 
         reader.onload = (e) => {
@@ -327,7 +323,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
         };
 
         reader.onerror = () => {
-          // Fallback olarak object URL dene
+          // Fallback to object URL
           try {
             const objectUrl = URL.createObjectURL(file);
             resolve(objectUrl);
@@ -338,7 +334,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
 
         reader.readAsDataURL(file);
       } catch {
-        // Son çare olarak boş string döndür
+        // Last resort — return empty string
         resolve('');
       }
     });
@@ -560,11 +556,6 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
     );
 
     try {
-      for (let progress = 10; progress <= 90; progress += 20) {
-        setFiles((prev) => prev.map((f) => (f.id === uploadFile.id ? { ...f, progress } : f)));
-        await new Promise((resolve) => setTimeout(resolve, 200));
-      }
-
       const isVideo = uploadFile.file.type.startsWith('video/');
       let data;
 
@@ -591,7 +582,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
         }
 
         // Upload directly to S3 using the presigned URL
-        setFiles((prev) => prev.map((f) => (f.id === uploadFile.id ? { ...f, progress: 30 } : f)));
+        setFiles((prev) => prev.map((f) => (f.id === uploadFile.id ? { ...f, progress: 20 } : f)));
 
         const uploadRes = await fetch(presignedData.presignedUrl, {
           method: 'PUT',
@@ -605,7 +596,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
           throw new Error('Failed to upload video file');
         }
 
-        setFiles((prev) => prev.map((f) => (f.id === uploadFile.id ? { ...f, progress: 80 } : f)));
+        setFiles((prev) => prev.map((f) => (f.id === uploadFile.id ? { ...f, progress: 70 } : f)));
 
         data = {
           url: presignedData.publicUrl,
@@ -621,6 +612,9 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
         const formData = new FormData();
         formData.append('file', uploadFile.file);
         formData.append('guestName', guestName);
+
+        // No real progress events from fetch(); show 50% to indicate upload started
+        setFiles((prev) => prev.map((f) => (f.id === uploadFile.id ? { ...f, progress: 50 } : f)));
 
         const res = await fetch('/api/upload', {
           method: 'POST',
@@ -725,7 +719,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
   const handleNameChange = () => {
     const rawValue = currentNameValue;
     // Final validation before submitting
-    const error = validateName(rawValue);
+    const error = validateGuestNameForUI(rawValue, t);
     if (error) {
       setNameError(error);
       return;
@@ -748,7 +742,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
   const handleNameInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setCurrentNameValue(value);
-    const error = validateName(value);
+    const error = validateGuestNameForUI(value, t);
     setNameError(error);
   };
 
@@ -896,8 +890,8 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
 
                       <div className="text-sm font-medium text-muted-foreground ml-2">
                         {selectedFiles.size > 0
-                          ? `${selectedFiles.size} selected`
-                          : `${pendingFiles.length} files`}
+                          ? t('upload.countSelected', { count: selectedFiles.size })
+                          : t('upload.countFiles', { count: pendingFiles.length })}
                       </div>
                     </div>
 

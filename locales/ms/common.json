@@ -38,6 +38,8 @@
     "filesSelected": "{{count}} fail dipilih",
     "filesSelected_plural": "{{count}} fail dipilih",
     "clearCompleted": "Kosongkan Selesai",
+    "countSelected": "{{count}} dipilih",
+    "countFiles": "{{count}} fail",
     "addCount": "Tambah {{count}} Fail",
     "addCount_plural": "Tambah {{count}} Fail",
     "adding": "Menambah... ({{count}})",
