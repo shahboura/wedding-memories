@@ -1200,7 +1200,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
                         e.stopPropagation();
                         triggerFileInput();
                       }}
-                      className="h-10 w-10 border-dashed border-muted-foreground/50 hover:border-primary/50 hover:bg-muted/25 text-muted-foreground hover:text-primary touch-manipulation"
+                      className="border-dashed border-muted-foreground/50 hover:border-primary/50 hover:bg-muted/25 text-muted-foreground hover:text-primary touch-manipulation"
                       aria-label={t('upload.addMore')}
                     >
                       <Plus className="w-5 h-5" />
@@ -1384,7 +1384,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
                       e.stopPropagation();
                       triggerFileInput();
                     }}
-                    className="h-10 w-10 border-dashed border-muted-foreground/50 hover:border-primary/50 hover:bg-muted/25 text-muted-foreground hover:text-primary touch-manipulation"
+                    className="border-dashed border-muted-foreground/50 hover:border-primary/50 hover:bg-muted/25 text-muted-foreground hover:text-primary touch-manipulation"
                     aria-label={t('upload.addMore')}
                   >
                     <Plus className="w-5 h-5" />
