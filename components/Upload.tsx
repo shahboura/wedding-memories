@@ -8,8 +8,9 @@ import { Button } from './ui/button';
 import {
   useGuestName,
   useSetGuestName,
-  useAddMedia,
+  useSetMedia,
   useMediaModalOpen,
+  useRefreshMedia,
 } from '../store/useAppStore';
 import {
   Drawer,
@@ -58,7 +59,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 
-import type { UploadFile, MediaProps } from '../utils/types';
+import type { UploadFile } from '../utils/types';
 import { formatFileSize, getCompressionInfo } from '../utils/clientUtils';
 import { useI18n } from './I18nProvider';
 import { useSearchParams } from 'next/navigation';
@@ -109,7 +110,8 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
   const photoId = searchParams?.get('photoId') || null;
 
   const isModalOpen = !!photoId || isMediaModalOpen;
-  const addMedia = useAddMedia();
+  const setMedia = useSetMedia();
+  const refreshMedia = useRefreshMedia();
   const { t } = useI18n();
 
   const [files, setFiles] = useState<UploadFile[]>([]);
@@ -511,7 +513,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
     fileInputRef.current?.click();
   };
 
-  const uploadFile = async (uploadFile: UploadFile) => {
+  const uploadFile = async (uploadFile: UploadFile): Promise<boolean> => {
     setFiles((prev) =>
       prev.map((f) => (f.id === uploadFile.id ? { ...f, status: 'uploading', progress: 0 } : f))
     );
@@ -593,26 +595,9 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
         setFiles((prev) =>
           prev.map((f) => (f.id === uploadFile.id ? { ...f, status: 'success', progress: 100 } : f))
         );
-
-        const newMedia: MediaProps = {
-          id: Date.now(),
-          public_id: data.public_id || data.url || '',
-          format: data.format,
-          resource_type: data.resource_type,
-          blurDataUrl: '',
-          guestName: data.guestName || guestName,
-          uploadDate: data.uploadDate || data.created_at,
-          height: data.height || 480,
-          width: data.width || 720,
-          videoId: data.videoId,
-          duration: data.duration,
-        };
-
-        // Add to global store with queueMicrotask to avoid setState during render
-        queueMicrotask(() => {
-          addMedia(newMedia);
-        });
+        return true;
       }
+      return false;
     } catch (uploadError) {
       setFiles((prev) =>
         prev.map((f) =>
@@ -626,6 +611,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
             : f
         )
       );
+      return false;
     }
   };
 
@@ -649,10 +635,15 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
     const CONCURRENCY = 3;
     const queue = [...pendingFiles];
 
+    // Track successes via return values — not React state (which batches asynchronously)
+    let successCount = 0;
     const runWorker = async () => {
       while (queue.length > 0) {
         const next = queue.shift();
-        if (next) await uploadFile(next);
+        if (next) {
+          const succeeded = await uploadFile(next);
+          if (succeeded) successCount++;
+        }
       }
     };
 
@@ -662,18 +653,38 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
 
     setIsUploading(false);
 
-    // Use a callback to read latest file state and count successes
+    if (successCount > 0) {
+      setLastUploadSuccessCount(successCount);
+    }
+
+    // Clean up completed files from the upload list
     setFiles((prev) => {
-      const succeeded = prev.filter((f) => f.status === 'success').length;
-      if (succeeded > 0) {
-        setLastUploadSuccessCount(succeeded);
-      }
       // Revoke thumbnails for completed files before clearing them
       const completed = prev.filter((f) => f.status === 'success' || f.status === 'error');
       revokeThumbnails(completed);
       // Keep only pending/uploading files (clear success + error)
       return prev.filter((f) => f.status === 'pending' || f.status === 'uploading');
     });
+
+    // Refetch gallery from server to get proper thumbnails, blur data, and correct IDs.
+    // This replaces the old per-file addMedia() which produced broken gallery entries
+    // (empty blurDataUrl, missing video thumbnails, client-generated IDs).
+    if (successCount > 0) {
+      try {
+        let url = '/api/photos';
+        if (appConfig.guestIsolation && guestName) {
+          url += `?guest=${encodeURIComponent(guestName)}`;
+        }
+        const response = await fetch(url);
+        if (response.ok) {
+          const freshMedia = await response.json();
+          setMedia(freshMedia);
+          refreshMedia();
+        }
+      } catch (error) {
+        console.error('Failed to refresh gallery after upload:', error);
+      }
+    }
   };
 
   const handleNameChange = () => {

@@ -8,11 +8,10 @@ interface AppState {
 
   media: MediaProps[];
   setMedia: (media: MediaProps[]) => void;
-  addMedia: (media: MediaProps) => void;
 
   isMediaModalOpen: boolean;
-  selectedMediaIndex: number;
-  openMediaModal: (index: number) => void;
+  selectedMediaId: number | string | null;
+  openMediaModal: (id: number | string) => void;
   closeMediaModal: () => void;
 
   isUploadModalOpen: boolean;
@@ -35,21 +34,18 @@ const useAppStore = create<AppState>()(
 
       media: [],
       setMedia: (media: MediaProps[]) => set({ media }),
-      addMedia: (mediaItem: MediaProps) =>
-        set((state) => ({
-          media: [mediaItem, ...state.media],
-        })),
 
       isMediaModalOpen: false,
-      selectedMediaIndex: 0,
-      openMediaModal: (index: number) =>
+      selectedMediaId: null,
+      openMediaModal: (id: number | string) =>
         set({
           isMediaModalOpen: true,
-          selectedMediaIndex: index,
+          selectedMediaId: id,
         }),
       closeMediaModal: () =>
         set({
           isMediaModalOpen: false,
+          selectedMediaId: null,
         }),
 
       isUploadModalOpen: false,
@@ -81,10 +77,9 @@ export const useSetGuestName = () => useAppStore((state) => state.setGuestName);
 
 export const useMedia = () => useAppStore((state) => state.media);
 export const useSetMedia = () => useAppStore((state) => state.setMedia);
-export const useAddMedia = () => useAppStore((state) => state.addMedia);
 
 export const useMediaModalOpen = () => useAppStore((state) => state.isMediaModalOpen);
-export const useSelectedMediaIndex = () => useAppStore((state) => state.selectedMediaIndex);
+export const useSelectedMediaId = () => useAppStore((state) => state.selectedMediaId);
 export const useOpenMediaModal = () => useAppStore((state) => state.openMediaModal);
 export const useCloseMediaModal = () => useAppStore((state) => state.closeMediaModal);
 

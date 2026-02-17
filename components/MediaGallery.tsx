@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useCallback, useRef } from 'react';
+import { useEffect, useCallback, useRef, useMemo } from 'react';
 import type { MediaProps } from '../utils/types';
 import { appConfig } from '../config';
 import { getOptimizedMediaProps, prefetchMediaOnInteraction } from '../utils/mediaOptimization';
@@ -14,7 +14,7 @@ import {
   useMedia,
   useSetMedia,
   useMediaModalOpen,
-  useSelectedMediaIndex,
+  useSelectedMediaId,
   useOpenMediaModal,
   useCloseMediaModal,
   useIsLoadingMedia,
@@ -47,12 +47,12 @@ function formatUploadDate(dateString: string, locale: string = 'en-US'): string 
 
 function handleMediaKeyNavigation(
   event: React.KeyboardEvent,
-  mediaIndex: number,
-  onOpenModal: (index: number) => void
+  mediaId: number | string,
+  onOpenModal: (id: number | string) => void
 ): void {
   if (event.key === 'Enter' || event.key === ' ') {
     event.preventDefault();
-    onOpenModal(mediaIndex);
+    onOpenModal(mediaId);
   }
 }
 
@@ -60,7 +60,7 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
   const media = useMedia();
   const setMedia = useSetMedia();
   const isModalOpen = useMediaModalOpen();
-  const selectedMediaIndex = useSelectedMediaIndex();
+  const selectedMediaId = useSelectedMediaId();
   const openModal = useOpenMediaModal();
   const closeModal = useCloseMediaModal();
   const isLoading = useIsLoadingMedia();
@@ -71,6 +71,14 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
   const hasHydrated = useHasHydrated();
   const previousGuestName = useRef<string | null>(null);
   const { t, language } = useI18n();
+
+  // Resolve the selected media index from the stored ID.
+  // Falls back to 0 if the ID is not found (e.g., item was deleted).
+  const selectedMediaIndex = useMemo(() => {
+    if (selectedMediaId === null) return 0;
+    const idx = media.findIndex((m) => m.id === selectedMediaId);
+    return idx >= 0 ? idx : 0;
+  }, [selectedMediaId, media]);
 
   useEffect(() => {
     if (initialMedia.length > 0 && media.length === 0) {
@@ -200,8 +208,8 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
             key={mediaItem.id}
             role="gridcell"
             className="after:content group relative mb-5 block w-full cursor-pointer after:pointer-events-none after:absolute after:inset-0 after:rounded-lg after:shadow-highlight focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background"
-            onClick={() => openModal(index)}
-            onKeyDown={(e) => handleMediaKeyNavigation(e, index, openModal)}
+            onClick={() => openModal(mediaItem.id)}
+            onKeyDown={(e) => handleMediaKeyNavigation(e, mediaItem.id, openModal)}
             onMouseEnter={() => prefetchMediaOnInteraction(mediaItem, 'full')}
             tabIndex={0}
             aria-label={
