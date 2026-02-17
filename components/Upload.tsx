@@ -63,6 +63,39 @@ import { formatFileSize, getCompressionInfo } from '../utils/clientUtils';
 import { useI18n } from './I18nProvider';
 import { useSearchParams } from 'next/navigation';
 
+/** Revoke blob/object URLs used as thumbnails to prevent memory leaks. */
+const revokeThumbnails = (filesToRevoke: UploadFile[]) => {
+  for (const f of filesToRevoke) {
+    if (f.thumbnail && f.thumbnail.startsWith('blob:')) {
+      URL.revokeObjectURL(f.thumbnail);
+    }
+  }
+};
+
+interface TriggerButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  label: string;
+}
+
+const TriggerButton = React.forwardRef<HTMLButtonElement, TriggerButtonProps>(
+  function TriggerButton({ label, ...props }, ref) {
+    return (
+      <Button
+        ref={ref}
+        {...props}
+        size="lg"
+        className="fixed bottom-14 right-4 shadow-lg hover:shadow-xl transition-all duration-200 bg-primary hover:bg-primary/90 
+                   h-14 px-5 py-3 rounded-full flex items-center gap-3 text-sm font-medium
+                   mb-[env(safe-area-inset-bottom)]
+                   md:h-12 md:px-6 md:py-3 md:rounded-lg md:gap-2 md:text-sm md:font-medium md:mb-0"
+      >
+        <Camera className="h-5 w-5 md:h-5 md:w-5" />
+        <span className="hidden sm:inline">{label}</span>
+        <span className="sm:hidden">{label}</span>
+      </Button>
+    );
+  }
+);
+
 interface UploadProps {
   currentGuestName?: string;
 }
@@ -105,8 +138,15 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const longPressTriggeredRef = useRef(false);
+  const filesRef = useRef(files);
 
   const { toast } = useToast();
+
+  // Keep ref in sync for unmount cleanup
+  useEffect(() => {
+    filesRef.current = files;
+  }, [files]);
 
   const validateName = (name: string): string | null => {
     return validateGuestNameForUI(name, t);
@@ -119,13 +159,27 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
   }, [currentGuestName, guestName, setGuestName]);
 
   useEffect(() => {
+    let rafId: number;
     const checkScreenSize = () => {
-      setIsLargeScreen(window.innerWidth >= 1024); // lg breakpoint
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        setIsLargeScreen(window.innerWidth >= 1024); // lg breakpoint
+      });
     };
 
     checkScreenSize();
     window.addEventListener('resize', checkScreenSize);
-    return () => window.removeEventListener('resize', checkScreenSize);
+    return () => {
+      cancelAnimationFrame(rafId);
+      window.removeEventListener('resize', checkScreenSize);
+    };
+  }, []);
+
+  // Revoke all blob thumbnail URLs on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      revokeThumbnails(filesRef.current);
+    };
   }, []);
 
   // Auto-close the drawer/dialog after successful upload and show a toast
@@ -296,12 +350,24 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
         return `fallback_${file.name}_${file.size}_${file.lastModified}`;
       }
 
-      if (file.size > 2 * 1024 * 1024 * 1024) {
-        return `large_${file.name}_${file.size}_${file.lastModified}`;
-      }
+      // For files larger than 10MB, hash only the first and last 512KB
+      // to avoid reading the entire file into memory (OOM risk on mobile).
+      const PARTIAL_THRESHOLD = 10 * 1024 * 1024; // 10MB
+      const CHUNK_SIZE = 512 * 1024; // 512KB
 
       let arrayBuffer: ArrayBuffer;
-      if (file.arrayBuffer) {
+
+      if (file.size > PARTIAL_THRESHOLD) {
+        const head = await file.slice(0, CHUNK_SIZE).arrayBuffer();
+        const tail = await file.slice(file.size - CHUNK_SIZE).arrayBuffer();
+        // Combine head + tail + size bytes for uniqueness
+        const sizeBytes = new TextEncoder().encode(String(file.size));
+        const combined = new Uint8Array(head.byteLength + tail.byteLength + sizeBytes.byteLength);
+        combined.set(new Uint8Array(head), 0);
+        combined.set(new Uint8Array(tail), head.byteLength);
+        combined.set(sizeBytes, head.byteLength + tail.byteLength);
+        arrayBuffer = combined.buffer;
+      } else if (file.arrayBuffer) {
         arrayBuffer = await file.arrayBuffer();
       } else {
         arrayBuffer = await new Promise<ArrayBuffer>((resolve, reject) => {
@@ -340,12 +406,12 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
     });
   };
 
-  const handleFileSelect = async (selectedFiles: FileList | null) => {
-    if (!selectedFiles) {
+  const handleFileSelect = async (fileList: FileList | null) => {
+    if (!fileList) {
       return;
     }
 
-    const validFiles = Array.from(selectedFiles).filter((file) => {
+    const validFiles = Array.from(fileList).filter((file) => {
       try {
         return isValidMediaFile(file);
       } catch {
@@ -421,7 +487,11 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
   };
 
   const removeFile = (id: string) => {
-    setFiles((prev) => prev.filter((f) => f.id !== id));
+    setFiles((prev) => {
+      const removed = prev.filter((f) => f.id === id);
+      revokeThumbnails(removed);
+      return prev.filter((f) => f.id !== id);
+    });
     setFileToDelete(null);
     setSelectedFiles((prev) => {
       const newSet = new Set(prev);
@@ -464,7 +534,11 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
 
   const removeSelectedFiles = () => {
     const removedCount = selectedFiles.size;
-    setFiles((prev) => prev.filter((f) => !selectedFiles.has(f.id)));
+    setFiles((prev) => {
+      const removed = prev.filter((f) => selectedFiles.has(f.id));
+      revokeThumbnails(removed);
+      return prev.filter((f) => !selectedFiles.has(f.id));
+    });
     setSelectedFiles(new Set());
     setIsSelectionMode(false);
 
@@ -617,7 +691,20 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
     setIsUploading(true);
     setLastUploadSuccessCount(0);
 
-    await Promise.all(pendingFiles.map((file) => uploadFile(file)));
+    // Upload with concurrency limit to avoid overwhelming the server
+    const CONCURRENCY = 3;
+    const queue = [...pendingFiles];
+
+    const runWorker = async () => {
+      while (queue.length > 0) {
+        const next = queue.shift();
+        if (next) await uploadFile(next);
+      }
+    };
+
+    await Promise.all(
+      Array.from({ length: Math.min(CONCURRENCY, queue.length) }, () => runWorker())
+    );
 
     setIsUploading(false);
 
@@ -627,6 +714,9 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
       if (succeeded > 0) {
         setLastUploadSuccessCount(succeeded);
       }
+      // Revoke thumbnails for completed files before clearing them
+      const completed = prev.filter((f) => f.status === 'success' || f.status === 'error');
+      revokeThumbnails(completed);
       // Keep only pending/uploading files (clear success + error)
       return prev.filter((f) => f.status === 'pending' || f.status === 'uploading');
     });
@@ -667,7 +757,11 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
   };
 
   const clearCompleted = () => {
-    setFiles((prev) => prev.filter((f) => f.status === 'pending' || f.status === 'uploading'));
+    setFiles((prev) => {
+      const completed = prev.filter((f) => f.status !== 'pending' && f.status !== 'uploading');
+      revokeThumbnails(completed);
+      return prev.filter((f) => f.status === 'pending' || f.status === 'uploading');
+    });
   };
 
   const handleViewGallery = () => {
@@ -688,19 +782,18 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
   const allPendingSelected =
     pendingFiles.length > 0 && selectedPendingFiles.length === pendingFiles.length;
 
-  // Shared content component for both Dialog and Drawer
-  const UploadContent = () => (
-    <div className="flex-1 flex flex-col gap-3 p-3 select-none overflow-y-auto">
+  // Shared content for both Dialog and Drawer
+  const uploadContent = (
+    <div className="flex-1 flex flex-col gap-3 p-3 select-none min-h-0">
       {/* Post-upload success state removed — auto-close + toast handles this now */}
 
       {/* Drop area - iOS optimized */}
       <div
         className={cn(
-          'flex-1 rounded-lg transition-colors relative flex items-center justify-center',
+          'flex-1 rounded-lg transition-colors relative flex items-center justify-center min-h-0',
           !hasFiles &&
             'border border-border/30 hover:border-border/60 hover:bg-muted/20 p-6 text-center cursor-pointer touch-manipulation',
-          hasFiles &&
-            'border border-border/50 bg-muted/5 p-3 flex-col items-stretch justify-start overflow-y-auto'
+          hasFiles && 'border border-border/50 bg-muted/5 p-3 flex-col items-stretch justify-start'
         )}
         onDrop={(e) => {
           e.preventDefault();
@@ -744,8 +837,8 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
           </div>
         ) : (
           // Files selected state - show files inside the drop zone
-          <div className="space-y-3">
-            <div className="space-y-3">
+          <div className="flex-1 flex flex-col gap-3 min-h-0">
+            <div className="flex-shrink-0">
               {/* Header with file count and actions */}
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-2">
@@ -826,7 +919,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
             </div>
 
             {/* Compact grid layout for files - stable layout */}
-            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2 max-h-60 overflow-y-auto p-1 custom-scrollbar">
+            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2 flex-1 min-h-0 overflow-y-auto p-1 custom-scrollbar">
               {files.map((uploadFile) => (
                 <div
                   key={uploadFile.id}
@@ -846,6 +939,10 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
                   <div
                     className="relative aspect-square group cursor-pointer overflow-hidden rounded-md select-none"
                     onClick={(e) => {
+                      if (longPressTriggeredRef.current) {
+                        longPressTriggeredRef.current = false;
+                        return;
+                      }
                       if (isSelectionMode && uploadFile.status === 'pending') {
                         toggleFileSelection(uploadFile.id);
                       } else if (!isSelectionMode && uploadFile.status === 'pending') {
@@ -860,11 +957,11 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
                     }}
                     onTouchStart={() => {
                       if (!isSelectionMode && uploadFile.status === 'pending') {
-                        // Mobile: Long press starts multi-select
                         const touchTimer = setTimeout(() => {
+                          longPressTriggeredRef.current = true;
                           setIsSelectionMode(true);
                           toggleFileSelection(uploadFile.id);
-                        }, 500); // 500ms long press
+                        }, 500);
 
                         const cleanup = () => {
                           clearTimeout(touchTimer);
@@ -990,7 +1087,11 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
           </div>
         )}
       </div>
+    </div>
+  );
 
+  const sharedDialogsAndInput = (
+    <>
       {/* Confirmation Dialog */}
       <AlertDialog open={!!fileToDelete} onOpenChange={() => setFileToDelete(null)}>
         <AlertDialogContent>
@@ -1021,30 +1122,8 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
         className="hidden"
         id="wedding-memories-file-input"
       />
-    </div>
+    </>
   );
-
-  const TriggerButton = React.forwardRef<
-    HTMLButtonElement,
-    React.ButtonHTMLAttributes<HTMLButtonElement>
-  >(function TriggerButton(props, ref) {
-    return (
-      <Button
-        ref={ref}
-        {...props}
-        onClick={props.onClick}
-        size="lg"
-        className="fixed bottom-14 right-4 shadow-lg hover:shadow-xl transition-all duration-200 bg-primary hover:bg-primary/90 
-                   h-14 px-5 py-3 rounded-full flex items-center gap-3 text-sm font-medium
-                   mb-[env(safe-area-inset-bottom)]
-                   md:h-12 md:px-6 md:py-3 md:rounded-lg md:gap-2 md:text-sm md:font-medium md:mb-0"
-      >
-        <Camera className="h-5 w-5 md:h-5 md:w-5" />
-        <span className="hidden sm:inline">{t('upload.addFiles')}</span>
-        <span className="sm:hidden">{t('upload.addFiles')}</span>
-      </Button>
-    );
-  });
 
   if (isLargeScreen) {
     // Desktop: Use Dialog
@@ -1058,7 +1137,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
           }}
         >
           <DialogTrigger asChild>
-            <TriggerButton />
+            <TriggerButton label={t('upload.addFiles')} />
           </DialogTrigger>
           <DialogContent className="sm:max-w-2xl max-h-[90dvh] overflow-hidden flex flex-col">
             <DialogHeader>
@@ -1091,7 +1170,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
               </div>
             </DialogHeader>
 
-            <UploadContent />
+            {uploadContent}
 
             <DialogFooter className="flex-shrink-0">
               {hasSuccessfulUploads && pendingCount === 0 ? (
@@ -1224,11 +1303,11 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {sharedDialogsAndInput}
       </>
     );
   }
-
-  // Mobile/Tablet: Use Drawer
   return (
     <div
       className={`fixed bottom-30 right-6 z-50 transition-opacity duration-200 ${isModalOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
@@ -1241,7 +1320,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
         }}
       >
         <DrawerTrigger asChild>
-          <TriggerButton />
+          <TriggerButton label={t('upload.addFiles')} />
         </DrawerTrigger>
         <DrawerContent className="max-h-[90dvh] h-[90dvh] flex flex-col">
           <DrawerHeader className="flex-shrink-0 border-b bg-background/95 backdrop-blur">
@@ -1273,9 +1352,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
             </div>
           </DrawerHeader>
 
-          <div className="flex-1 flex flex-col">
-            <UploadContent />
-          </div>
+          <div className="flex-1 flex flex-col min-h-0">{uploadContent}</div>
 
           <DrawerFooter className="flex-shrink-0 border-t bg-background/95 backdrop-blur">
             {hasSuccessfulUploads && pendingCount === 0 ? (
@@ -1412,6 +1489,8 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {sharedDialogsAndInput}
     </div>
   );
 };
