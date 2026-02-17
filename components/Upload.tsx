@@ -123,6 +123,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [fileToDelete, setFileToDelete] = useState<string | null>(null);
   const [isEditingName, setIsEditingName] = useState(false);
+  const [isEditingNameMobile, setIsEditingNameMobile] = useState(false);
   const [isUpdatingName, setIsUpdatingName] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
   const [currentNameValue, setCurrentNameValue] = useState('');
@@ -745,6 +746,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
     // aria-hidden to an ancestor that still contains the focused element.
     nameInputRef.current?.blur();
     setIsEditingName(false);
+    setIsEditingNameMobile(false);
     setIsUpdatingName(false);
   };
 
@@ -1316,7 +1318,11 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
         open={isOpen}
         onOpenChange={(open) => {
           setIsOpen(open);
-          if (!open) setLastUploadSuccessCount(0);
+          if (!open) {
+            setLastUploadSuccessCount(0);
+            setIsEditingNameMobile(false);
+            setNameError(null);
+          }
         }}
       >
         <DrawerTrigger asChild>
@@ -1333,21 +1339,89 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
                   interpolation: { escapeValue: false },
                 })}
               </DrawerDescription>
-              <div
-                className="pt-2 border-t cursor-pointer"
-                onClick={() => {
-                  setIsEditingName(true);
-                }}
-              >
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors">
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs text-muted-foreground">{t('upload.addingAs')}</span>
-                    <span className="font-medium text-foreground">
-                      {guestName || t('upload.notSet')}
-                    </span>
+              <div className="pt-2 border-t">
+                {isEditingNameMobile ? (
+                  <div className="space-y-2 p-3 rounded-lg bg-muted/50">
+                    <label className="text-xs text-muted-foreground">{t('nameDialog.title')}</label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        ref={nameInputRef}
+                        type="text"
+                        placeholder={t('nameDialog.placeholder')}
+                        value={currentNameValue}
+                        autoFocus
+                        disabled={isUpdatingName}
+                        onChange={handleNameInput}
+                        onKeyDown={(e) => {
+                          if (isUpdatingName) return;
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (!nameError) {
+                              handleNameChange();
+                            }
+                          } else if (e.key === 'Escape') {
+                            e.preventDefault();
+                            nameInputRef.current?.blur();
+                            setIsEditingNameMobile(false);
+                            setNameError(null);
+                          }
+                        }}
+                        enterKeyHint="done"
+                        className={cn(
+                          'h-9 flex-1',
+                          nameError && 'border-destructive focus:border-destructive'
+                        )}
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground"
+                        onClick={() => {
+                          nameInputRef.current?.blur();
+                          setIsEditingNameMobile(false);
+                          setNameError(null);
+                        }}
+                        disabled={isUpdatingName}
+                        aria-label={t('upload.cancel')}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-9 w-9 shrink-0 text-primary hover:text-primary/80"
+                        onClick={handleNameChange}
+                        disabled={isUpdatingName || !!nameError}
+                        aria-label={t('nameDialog.updateName')}
+                      >
+                        <Check className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    {nameError && (
+                      <p className="text-xs text-destructive flex items-center gap-1">
+                        <span className="w-3 h-3">⚠️</span>
+                        {nameError}
+                      </p>
+                    )}
                   </div>
-                  <Edit className="w-4 h-4 text-muted-foreground" />
-                </div>
+                ) : (
+                  <div
+                    className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors cursor-pointer"
+                    onClick={() => {
+                      setCurrentNameValue(guestName || '');
+                      setNameError(null);
+                      setIsEditingNameMobile(true);
+                    }}
+                  >
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs text-muted-foreground">{t('upload.addingAs')}</span>
+                      <span className="font-medium text-foreground">
+                        {guestName || t('upload.notSet')}
+                      </span>
+                    </div>
+                    <Edit className="w-4 h-4 text-muted-foreground" />
+                  </div>
+                )}
               </div>
             </div>
           </DrawerHeader>
@@ -1408,87 +1482,6 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
           </DrawerFooter>
         </DrawerContent>
       </Drawer>
-
-      {/* Name edit dialog for mobile */}
-      <Dialog
-        open={isEditingName}
-        onOpenChange={(open) => {
-          if (!isUpdatingName) {
-            setIsEditingName(open);
-            if (open) {
-              setCurrentNameValue(guestName || '');
-              setNameError(null);
-            } else {
-              setNameError(null);
-            }
-          }
-        }}
-      >
-        <DialogContent className="sm:max-w-md" onCloseAutoFocus={(e) => e.preventDefault()}>
-          <DialogHeader>
-            <DialogTitle>{t('nameDialog.title')}</DialogTitle>
-            <DialogDescription>{t('nameDialog.descriptionMobile')}</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Input
-                ref={nameInputRef}
-                type="text"
-                placeholder={t('nameDialog.placeholder')}
-                value={currentNameValue}
-                autoFocus
-                disabled={isUpdatingName}
-                onChange={handleNameInput}
-                onKeyDown={(e) => {
-                  if (isUpdatingName) return;
-
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    if (!nameError) {
-                      handleNameChange();
-                    }
-                  } else if (e.key === 'Escape') {
-                    e.preventDefault();
-                    nameInputRef.current?.blur();
-                    setIsEditingName(false);
-                  }
-                }}
-                className={nameError ? 'border-destructive focus:border-destructive' : ''}
-              />
-              <div className="h-6 flex items-center">
-                {nameError && (
-                  <p className="text-sm text-destructive flex items-center gap-2">
-                    <span className="w-4 h-4">⚠️</span>
-                    {nameError}
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-          <DialogFooter className="flex-col sm:flex-row gap-3 sm:gap-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                if (!isUpdatingName) {
-                  nameInputRef.current?.blur();
-                  setIsEditingName(false);
-                }
-              }}
-              className="w-full sm:w-auto order-2 sm:order-1"
-              disabled={isUpdatingName}
-            >
-              {t('upload.cancel')}
-            </Button>
-            <Button
-              onClick={handleNameChange}
-              className="w-full sm:w-auto order-1 sm:order-2"
-              disabled={isUpdatingName || !!nameError}
-            >
-              {isUpdatingName ? t('nameDialog.updating') : t('nameDialog.updateName')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {sharedDialogsAndInput}
     </div>
