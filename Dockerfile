@@ -17,12 +17,14 @@ RUN pnpm install --frozen-lockfile --prod=false
 # ============================================================
 FROM node:25-alpine AS builder
 
-# Build arguments for configurable values
-ARG BRIDE_NAME=Bride
-ARG GROOM_NAME=Groom
-ARG WHATSAPP_NUMBER=
-ARG STORAGE_PROVIDER=local
-ARG GUEST_ISOLATION=true
+# Build arguments — NEXT_PUBLIC_* vars are inlined into the JS bundle
+# by Next.js at build time, so they work on both server and client.
+ARG NEXT_PUBLIC_BRIDE_NAME=Bride
+ARG NEXT_PUBLIC_GROOM_NAME=Groom
+ARG NEXT_PUBLIC_WHATSAPP_NUMBER=
+ARG NEXT_PUBLIC_STORAGE_PROVIDER=local
+ARG NEXT_PUBLIC_GUEST_ISOLATION=true
+ARG NEXT_PUBLIC_DEFAULT_LANGUAGE=en
 
 RUN npm install -g pnpm
 
@@ -31,12 +33,13 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Build-time env vars (baked into the bundle)
-ENV STORAGE_PROVIDER=${STORAGE_PROVIDER}
-ENV BRIDE_NAME=${BRIDE_NAME}
-ENV GROOM_NAME=${GROOM_NAME}
-ENV WHATSAPP_NUMBER=${WHATSAPP_NUMBER}
-ENV GUEST_ISOLATION=${GUEST_ISOLATION}
+# Expose build args as env vars so Next.js can inline them
+ENV NEXT_PUBLIC_STORAGE_PROVIDER=${NEXT_PUBLIC_STORAGE_PROVIDER}
+ENV NEXT_PUBLIC_BRIDE_NAME=${NEXT_PUBLIC_BRIDE_NAME}
+ENV NEXT_PUBLIC_GROOM_NAME=${NEXT_PUBLIC_GROOM_NAME}
+ENV NEXT_PUBLIC_WHATSAPP_NUMBER=${NEXT_PUBLIC_WHATSAPP_NUMBER}
+ENV NEXT_PUBLIC_GUEST_ISOLATION=${NEXT_PUBLIC_GUEST_ISOLATION}
+ENV NEXT_PUBLIC_DEFAULT_LANGUAGE=${NEXT_PUBLIC_DEFAULT_LANGUAGE}
 ENV NEXT_TELEMETRY_DISABLED=1
 # Skip env validation during build (credentials aren't available yet)
 ENV SKIP_ENV_VALIDATION=1
@@ -54,6 +57,8 @@ FROM node:25-alpine AS runner
 
 WORKDIR /app
 
+# Runtime env vars — only what the server needs at runtime.
+# NEXT_PUBLIC_* vars are already inlined in the JS bundle from build stage.
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 

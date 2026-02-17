@@ -11,13 +11,14 @@ export enum Language {
 }
 
 /**
- * Resolves the storage provider from the STORAGE_PROVIDER env var,
+ * Resolves the storage provider from the NEXT_PUBLIC_STORAGE_PROVIDER env var,
  * falling back to the hardcoded default.
  *
- * These env vars are baked into the bundle at build time via Dockerfile.
+ * NEXT_PUBLIC_* env vars are inlined into both server and client bundles at
+ * build time by Next.js, so they work identically in SSR and hydration.
  */
 function resolveStorageProvider(): StorageProvider {
-  const envValue = process.env.STORAGE_PROVIDER?.toLowerCase();
+  const envValue = process.env.NEXT_PUBLIC_STORAGE_PROVIDER?.toLowerCase();
   if (envValue === 'local') return StorageProvider.Local;
   if (envValue === 's3') return StorageProvider.S3;
   if (envValue === 'cloudinary') return StorageProvider.Cloudinary;
@@ -25,11 +26,11 @@ function resolveStorageProvider(): StorageProvider {
 }
 
 export const appConfig = {
-  brideName: process.env.BRIDE_NAME || 'Bride',
-  groomName: process.env.GROOM_NAME || 'Groom',
-  guestIsolation: process.env.GUEST_ISOLATION !== 'false',
+  brideName: process.env.NEXT_PUBLIC_BRIDE_NAME || 'Bride',
+  groomName: process.env.NEXT_PUBLIC_GROOM_NAME || 'Groom',
+  guestIsolation: process.env.NEXT_PUBLIC_GUEST_ISOLATION !== 'false',
   storage: resolveStorageProvider(),
-  defaultLanguage: (process.env.DEFAULT_LANGUAGE as Language) || Language.English,
+  defaultLanguage: (process.env.NEXT_PUBLIC_DEFAULT_LANGUAGE as Language) || Language.English,
   supportedLanguages: [Language.English, Language.Malay],
-  whatsappNumber: process.env.WHATSAPP_NUMBER || '',
+  whatsappNumber: process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '',
 };

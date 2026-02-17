@@ -50,12 +50,11 @@ A modern, accessible wedding memories gallery supporting **both photos and video
    pnpm install
    ```
 
-2. **Configure environment and settings**
+2. **Configure environment**
 
    ```bash
    cp .env.example .env
-   # Edit .env with your Cloudinary credentials
-   # Edit config.ts for couple names and features
+   # Edit .env — set couple names, storage provider, and credentials
    ```
 
 3. **Start development**
@@ -100,10 +99,10 @@ export enum StorageProvider {
 }
 
 export const appConfig = {
-  brideName: 'YourBrideName', // or set BRIDE_NAME env var
-  groomName: 'YourGroomName', // or set GROOM_NAME env var
-  guestIsolation: false, // or set GUEST_ISOLATION env var
-  storage: StorageProvider.Cloudinary, // or set STORAGE_PROVIDER env var
+  brideName: 'YourBrideName', // or set NEXT_PUBLIC_BRIDE_NAME env var
+  groomName: 'YourGroomName', // or set NEXT_PUBLIC_GROOM_NAME env var
+  guestIsolation: false, // or set NEXT_PUBLIC_GUEST_ISOLATION env var
+  storage: StorageProvider.Cloudinary, // or set NEXT_PUBLIC_STORAGE_PROVIDER env var
 };
 ```
 
@@ -112,7 +111,7 @@ export const appConfig = {
 - **Local**: Filesystem storage with no cloud dependencies — ideal for Docker / self-hosted deployments
 - **Cloudinary**: Cloud-based media storage with automatic optimization, transformations, and blur placeholders for images/videos
 - **S3/Wasabi**: Object storage compatible with AWS S3 API via secure proxy with request deduplication and stream handling
-- **Seamless Switching**: Change providers via `STORAGE_PROVIDER` env var or `config.ts` — no code changes required
+- **Seamless Switching**: Change providers via `NEXT_PUBLIC_STORAGE_PROVIDER` env var or `config.ts` — no code changes required
 - **Smart Media Handling**: Automatic optimization for Cloudinary, proxy-based serving for S3/Wasabi with progressive video loading
 - **Feature Parity**: Download, external links, and all functionality work identically across providers
 
@@ -211,9 +210,9 @@ Deploy to [Vercel](https://vercel.com/new/clone) (recommended), Docker, or any p
    docker compose -f docker-compose.yml -f docker-compose.dev.yml up
    ```
 
-   - Uses `STORAGE_PROVIDER=local` by default — no cloud credentials needed
+   - Uses `NEXT_PUBLIC_STORAGE_PROVIDER=local` by default — no cloud credentials needed
    - Uploaded media persists in a Docker named volume (`wedding-uploads`)
-   - Set `BRIDE_NAME`, `GROOM_NAME`, `DEFAULT_LANGUAGE`, etc. in `.env`
+   - Set `NEXT_PUBLIC_BRIDE_NAME`, `NEXT_PUBLIC_GROOM_NAME`, `NEXT_PUBLIC_DEFAULT_LANGUAGE`, etc. in `.env`
    - See `.env.docker.example` for all available options
 
 3. **Other Platforms**

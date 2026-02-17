@@ -59,7 +59,7 @@ function isValidValue(value) {
 
 function validateEnvironment() {
   // Determine storage provider from env var first, then config.ts
-  let storageProvider = (process.env.STORAGE_PROVIDER || '').toLowerCase();
+  let storageProvider = (process.env.NEXT_PUBLIC_STORAGE_PROVIDER || '').toLowerCase();
 
   if (!storageProvider) {
     try {
