@@ -9,17 +9,17 @@ services:
         GROOM_NAME: ${GROOM_NAME:-Groom}
         WHATSAPP_NUMBER: ${WHATSAPP_NUMBER:-}
         STORAGE_PROVIDER: ${STORAGE_PROVIDER:-local}
+        GUEST_ISOLATION: ${GUEST_ISOLATION:-true}
     image: wedding-memories
     ports:
       - '${PORT:-3010}:3010'
     environment:
       # ---------------------------------------------------------------
-      # Note: BRIDE_NAME, GROOM_NAME, WHATSAPP_NUMBER, and STORAGE_PROVIDER
+      # Note: BRIDE_NAME, GROOM_NAME, WHATSAPP_NUMBER, STORAGE_PROVIDER, and GUEST_ISOLATION
       # are baked into the image at build time via build args.
       # The values below are for reference only and don't affect runtime.
       # ---------------------------------------------------------------
       - LOCAL_STORAGE_PATH=/app/uploads
-      - GUEST_ISOLATION=${GUEST_ISOLATION:-true}
       - DEFAULT_LANGUAGE=${DEFAULT_LANGUAGE:-en}
 
       # ---------------------------------------------------------------
