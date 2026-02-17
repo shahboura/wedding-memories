@@ -29,7 +29,7 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import type { MediaProps } from '../utils/types';
-import { getOptimizedMediaProps } from '../utils/mediaOptimization';
+import { getOptimizedMediaProps, prefetchMediaOnInteraction } from '../utils/mediaOptimization';
 import { getDownloadUrl, getExternalUrl } from '../utils/imageUrl';
 import { useI18n } from './I18nProvider';
 
@@ -177,13 +177,15 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
 
   const changeMediaIndex = useCallback(
     (newIndex: number) => {
-      // Pause any currently playing video before switching
-      const currentVideoElements = document.querySelectorAll('video');
-      currentVideoElements.forEach((video) => {
-        if (!video.paused) {
-          video.pause();
-        }
-      });
+      // Pause any currently playing video within the modal only
+      const container = mediaContainerRef.current;
+      if (container) {
+        container.querySelectorAll('video').forEach((video) => {
+          if (!video.paused) {
+            video.pause();
+          }
+        });
+      }
 
       setCurrentIndex(newIndex);
       resetView();
@@ -191,49 +193,38 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
     [resetView]
   );
 
-  // Preload adjacent videos for faster switching
+  // Prefetch adjacent media for faster switching
+  // Uses <link rel="prefetch"> instead of hidden <video> elements to avoid
+  // DOM bloat, memory leaks, and bandwidth competition on mobile.
+  // simpleMediaPrefetch() already deduplicates by checking existing link[href].
   useEffect(() => {
     if (!isOpen) return;
 
-    const preloadVideo = (index: number) => {
-      const item = items[index];
-      if (item?.resource_type === 'video') {
-        // Create hidden video element to preload
-        const video = document.createElement('video');
-        video.preload = 'metadata';
-        video.muted = true;
-        video.style.display = 'none';
-        video.src = getOptimizedMediaProps(item, 'modal', { quality: 'medium' }).src;
-        document.body.appendChild(video);
-
-        // Clean up after 10 seconds
-        setTimeout(() => {
-          if (document.body.contains(video)) {
-            document.body.removeChild(video);
-          }
-        }, 10000);
-      }
-    };
-
-    // Preload previous and next videos
     if (currentIndex > 0) {
-      preloadVideo(currentIndex - 1);
+      prefetchMediaOnInteraction(items[currentIndex - 1], 'medium');
     }
     if (currentIndex < items.length - 1) {
-      preloadVideo(currentIndex + 1);
+      prefetchMediaOnInteraction(items[currentIndex + 1], 'medium');
     }
   }, [currentIndex, items, isOpen]);
 
-  // Keyboard navigation
-  useKeypress('ArrowRight', () => {
-    if (currentIndex + 1 < items.length) changeMediaIndex(currentIndex + 1);
-  });
+  // Keyboard navigation — disabled when modal is closed to prevent
+  // background state mutations (e.g. currentIndex drift on arrow keys)
+  useKeypress(
+    'ArrowRight',
+    () => {
+      if (currentIndex + 1 < items.length) changeMediaIndex(currentIndex + 1);
+    },
+    { disabled: !isOpen }
+  );
 
-  useKeypress('ArrowLeft', () => {
-    if (currentIndex > 0) changeMediaIndex(currentIndex - 1);
-  });
-
-  useKeypress('Escape', onClose);
+  useKeypress(
+    'ArrowLeft',
+    () => {
+      if (currentIndex > 0) changeMediaIndex(currentIndex - 1);
+    },
+    { disabled: !isOpen }
+  );
 
   const currentItem = items[currentIndex];
   const isVideo = currentItem?.resource_type === 'video';
@@ -248,10 +239,10 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
   }, [currentItem, isVideo]);
 
   // Zoom keyboard shortcuts (for images only)
-  useKeypress('+', () => !isVideo && zoomIn());
-  useKeypress('=', () => !isVideo && zoomIn());
-  useKeypress('-', () => !isVideo && zoomOut());
-  useKeypress('0', () => !isVideo && resetZoom());
+  useKeypress('+', () => !isVideo && zoomIn(), { disabled: !isOpen });
+  useKeypress('=', () => !isVideo && zoomIn(), { disabled: !isOpen });
+  useKeypress('-', () => !isVideo && zoomOut(), { disabled: !isOpen });
+  useKeypress('0', () => !isVideo && resetZoom(), { disabled: !isOpen });
 
   // Touch event handlers for pinch-to-zoom
   const handleTouchStart = useCallback(
@@ -427,11 +418,7 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogPortal>
         <DialogOverlay className="fixed inset-0 z-50 bg-black/70 backdrop-blur-2xl" />
-        <DialogPrimitive.Content
-          className="fixed inset-0 z-50 flex items-center justify-center w-screen h-screen-dynamic p-0 border-0 bg-transparent shadow-none"
-          onEscapeKeyDown={onClose}
-          onPointerDownOutside={onClose}
-        >
+        <DialogPrimitive.Content className="fixed inset-0 z-50 flex items-center justify-center w-screen h-screen-dynamic p-0 border-0 bg-transparent shadow-none">
           <DialogTitle className="sr-only">
             Wedding media {currentIndex + 1} of {items.length}
             {currentItem.guestName && ` shared by ${currentItem.guestName}`}
