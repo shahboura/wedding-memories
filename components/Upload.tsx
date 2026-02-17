@@ -965,13 +965,24 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
                     }}
                   >
                     {uploadFile.thumbnail ? (
-                      <Image
-                        src={uploadFile.thumbnail}
-                        alt={uploadFile.file.name}
-                        width={100}
-                        height={100}
-                        className="w-full h-full object-cover transition-all duration-200"
-                      />
+                      uploadFile.file.type.startsWith('video/') &&
+                      uploadFile.thumbnail.startsWith('blob:') ? (
+                        <video
+                          src={uploadFile.thumbnail}
+                          muted
+                          playsInline
+                          preload="metadata"
+                          className="w-full h-full object-cover transition-all duration-200"
+                        />
+                      ) : (
+                        <Image
+                          src={uploadFile.thumbnail}
+                          alt={uploadFile.file.name}
+                          width={100}
+                          height={100}
+                          className="w-full h-full object-cover transition-all duration-200"
+                        />
+                      )
                     ) : uploadFile.file.type.startsWith('video/') ? (
                       <div className="w-full h-full bg-gradient-to-br from-blue-50 to-blue-100 flex flex-col items-center justify-center">
                         <div className="text-2xl mb-1">🎬</div>
@@ -1304,6 +1315,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
             setNameError(null);
           }
         }}
+        fixed
       >
         <DrawerTrigger asChild>
           <TriggerButton label={t('upload.addFiles')} />
