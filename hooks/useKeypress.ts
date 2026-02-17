@@ -36,18 +36,7 @@ export function useKeypress(
       const isTargetKey =
         key === targetKey ||
         // Handle + key (which can be = or +)
-        (targetKey === '+' && (key === '+' || key === '=')) ||
-        // Handle - key
-        (targetKey === '-' && key === '-') ||
-        // Handle 0 key
-        (targetKey === '0' && key === '0') ||
-        // Handle escape key variations
-        (targetKey === 'Escape' && key === 'Escape') ||
-        // Handle arrow keys
-        (targetKey === 'ArrowLeft' && key === 'ArrowLeft') ||
-        (targetKey === 'ArrowRight' && key === 'ArrowRight') ||
-        (targetKey === 'ArrowUp' && key === 'ArrowUp') ||
-        (targetKey === 'ArrowDown' && key === 'ArrowDown');
+        (targetKey === '+' && key === '=');
 
       if (isTargetKey) {
         if (options?.preventDefault !== false) {
@@ -68,7 +57,13 @@ export function useKeypress(
     return () => {
       target.removeEventListener('keydown', handleKeydown as EventListener);
     };
-  }, [targetKey, options]);
+  }, [
+    targetKey,
+    options?.disabled,
+    options?.preventDefault,
+    options?.stopPropagation,
+    options?.target,
+  ]);
 }
 
 export default useKeypress;

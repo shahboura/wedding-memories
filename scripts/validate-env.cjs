@@ -58,24 +58,9 @@ function isValidValue(value) {
 }
 
 function validateEnvironment() {
-  // Determine storage provider from env var first, then config.ts
-  let storageProvider = (process.env.NEXT_PUBLIC_STORAGE_PROVIDER || '').toLowerCase();
-
-  if (!storageProvider) {
-    try {
-      const fs = require('fs');
-      const configContent = fs.readFileSync('config.ts', 'utf8');
-      if (configContent.includes('StorageProvider.S3')) {
-        storageProvider = 's3';
-      } else if (configContent.includes('StorageProvider.Local')) {
-        storageProvider = 'local';
-      } else {
-        storageProvider = 'cloudinary';
-      }
-    } catch {
-      storageProvider = 'cloudinary';
-    }
-  }
+  // Determine storage provider from NEXT_PUBLIC_STORAGE_PROVIDER env var (required).
+  // Falls back to 'cloudinary' if not set, which requires cloud credentials.
+  const storageProvider = (process.env.NEXT_PUBLIC_STORAGE_PROVIDER || 'cloudinary').toLowerCase();
 
   // Local storage requires no cloud credentials
   if (storageProvider === 'local') {
