@@ -95,6 +95,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
   const [currentNameValue, setCurrentNameValue] = useState('');
   const nameInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [lastUploadSuccessCount, setLastUploadSuccessCount] = useState(0);
   const [isLargeScreen, setIsLargeScreen] = useState(() => {
     if (typeof window !== 'undefined') {
       return window.innerWidth >= 1024;
@@ -126,6 +127,22 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
     window.addEventListener('resize', checkScreenSize);
     return () => window.removeEventListener('resize', checkScreenSize);
   }, []);
+
+  // Auto-close the drawer/dialog after successful upload and show a toast
+  useEffect(() => {
+    if (lastUploadSuccessCount > 0 && files.length === 0 && isOpen) {
+      const timer = setTimeout(() => {
+        setIsOpen(false);
+        toast({
+          title: t('upload.filesSuccessfullyAdded'),
+          description: t('upload.filesAddedToGallery', { count: lastUploadSuccessCount }),
+        });
+        setLastUploadSuccessCount(0);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [lastUploadSuccessCount, files.length, isOpen, toast, t]);
 
   const isValidMediaFile = (file: File): boolean => {
     try {
@@ -598,19 +615,21 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
     if (pendingFiles.length === 0) return;
 
     setIsUploading(true);
+    setLastUploadSuccessCount(0);
 
     await Promise.all(pendingFiles.map((file) => uploadFile(file)));
 
     setIsUploading(false);
 
-    // Show success toast after all uploads complete
-    const successfulUploads = files.filter((f) => f.status === 'success').length;
-    if (successfulUploads > 0) {
-      toast({
-        title: t('success.uploadComplete'),
-        description: t('success.uploadCompleteDescription', { count: successfulUploads }),
-      });
-    }
+    // Use a callback to read latest file state and count successes
+    setFiles((prev) => {
+      const succeeded = prev.filter((f) => f.status === 'success').length;
+      if (succeeded > 0) {
+        setLastUploadSuccessCount(succeeded);
+      }
+      // Keep only pending/uploading files (clear success + error)
+      return prev.filter((f) => f.status === 'pending' || f.status === 'uploading');
+    });
   };
 
   const handleNameChange = async () => {
@@ -653,6 +672,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
 
   const handleViewGallery = () => {
     setIsOpen(false);
+    setLastUploadSuccessCount(0);
     // Scroll to top of page to show newly added photos
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -661,8 +681,8 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
   const hasCompleted = files.some((f) => f.status === 'success' || f.status === 'error');
   const pendingCount = files.filter((f) => f.status === 'pending').length;
   const uploadingCount = files.filter((f) => f.status === 'uploading').length;
-  const successCount = files.filter((f) => f.status === 'success').length;
-  const hasSuccessfulUploads = successCount > 0;
+  const successCount = lastUploadSuccessCount;
+  const hasSuccessfulUploads = lastUploadSuccessCount > 0;
   const pendingFiles = files.filter((f) => f.status === 'pending');
   const selectedPendingFiles = pendingFiles.filter((f) => selectedFiles.has(f.id));
   const allPendingSelected =
@@ -670,19 +690,8 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
 
   // Shared content component for both Dialog and Drawer
   const UploadContent = () => (
-    <div className="flex-1 flex flex-col gap-3 p-3 select-none">
-      {/* Success indicator when uploads are complete */}
-      {hasSuccessfulUploads && pendingCount === 0 && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
-          <div className="flex items-center justify-center gap-2 text-green-700 font-medium mb-2">
-            <Check className="h-5 w-5" />
-            {t('upload.filesSuccessfullyAdded')}
-          </div>
-          <p className="text-sm text-green-600">
-            {t('upload.filesAddedToGallery', { count: successCount })}
-          </p>
-        </div>
-      )}
+    <div className="flex-1 flex flex-col gap-3 p-3 select-none overflow-y-auto">
+      {/* Post-upload success state removed — auto-close + toast handles this now */}
 
       {/* Drop area - iOS optimized */}
       <div
@@ -817,7 +826,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
             </div>
 
             {/* Compact grid layout for files - stable layout */}
-            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2 max-h-60 p-1 custom-scrollbar">
+            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2 max-h-60 overflow-y-auto p-1 custom-scrollbar">
               {files.map((uploadFile) => (
                 <div
                   key={uploadFile.id}
@@ -977,31 +986,6 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
                   </div>
                 </div>
               ))}
-              {/* Add more photos button */}
-              {!isSelectionMode && (
-                <div className="relative rounded-lg bg-background transition-all duration-200 p-0.5 border border-dashed border-muted-foreground/50 hover:border-primary/50 hover:bg-muted/25">
-                  <div
-                    className="relative aspect-square group cursor-pointer overflow-hidden rounded-md flex items-center justify-center bg-muted/20 hover:bg-muted/40 transition-all duration-200 touch-manipulation"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      triggerFileInput();
-                    }}
-                  >
-                    <div className="flex flex-col items-center gap-1 text-muted-foreground group-hover:text-primary transition-colors">
-                      <Plus className="w-6 h-6" />
-                      <span className="text-xs font-medium">{t('upload.addMore')}</span>
-                    </div>
-                  </div>
-
-                  {/* Compact info area to match other items */}
-                  <div className="mt-1">
-                    <div className="text-xs text-muted-foreground text-center">
-                      {t('upload.photoVideo')}
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         )}
@@ -1065,7 +1049,13 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
     // Desktop: Use Dialog
     return (
       <>
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <Dialog
+          open={isOpen}
+          onOpenChange={(open) => {
+            setIsOpen(open);
+            if (!open) setLastUploadSuccessCount(0);
+          }}
+        >
           <DialogTrigger asChild>
             <TriggerButton />
           </DialogTrigger>
@@ -1114,8 +1104,28 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
                   </Button>
                 </div>
               ) : (
-                // Show standard upload interface
-                <div className="grid grid-cols-2 gap-2 w-full">
+                // Show standard upload interface with optional + button
+                <div
+                  className={cn(
+                    'grid gap-2 w-full',
+                    hasFiles && !isSelectionMode ? 'grid-cols-[auto_1fr_1fr]' : 'grid-cols-2'
+                  )}
+                >
+                  {hasFiles && !isSelectionMode && (
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        triggerFileInput();
+                      }}
+                      className="h-10 w-10 border-dashed border-muted-foreground/50 hover:border-primary/50 hover:bg-muted/25 text-muted-foreground hover:text-primary touch-manipulation"
+                      aria-label={t('upload.addMore')}
+                    >
+                      <Plus className="w-5 h-5" />
+                    </Button>
+                  )}
                   <Button variant="outline" onClick={() => setIsOpen(false)}>
                     {t('upload.close')}
                   </Button>
@@ -1222,7 +1232,13 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
     <div
       className={`fixed bottom-30 right-6 z-50 transition-opacity duration-200 ${isModalOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
     >
-      <Drawer open={isOpen} onOpenChange={setIsOpen}>
+      <Drawer
+        open={isOpen}
+        onOpenChange={(open) => {
+          setIsOpen(open);
+          if (!open) setLastUploadSuccessCount(0);
+        }}
+      >
         <DrawerTrigger asChild>
           <TriggerButton />
         </DrawerTrigger>
@@ -1274,8 +1290,28 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
                 </Button>
               </div>
             ) : (
-              // Show standard upload interface
-              <div className="grid grid-cols-2 gap-2">
+              // Show standard upload interface with optional + button
+              <div
+                className={cn(
+                  'grid gap-2',
+                  hasFiles && !isSelectionMode ? 'grid-cols-[auto_1fr_1fr]' : 'grid-cols-2'
+                )}
+              >
+                {hasFiles && !isSelectionMode && (
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      triggerFileInput();
+                    }}
+                    className="h-10 w-10 border-dashed border-muted-foreground/50 hover:border-primary/50 hover:bg-muted/25 text-muted-foreground hover:text-primary touch-manipulation"
+                    aria-label={t('upload.addMore')}
+                  >
+                    <Plus className="w-5 h-5" />
+                  </Button>
+                )}
                 <DrawerClose asChild>
                   <Button variant="outline" className="w-full">
                     {t('upload.close')}

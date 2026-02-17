@@ -128,9 +128,10 @@ export const appConfig = {
 
 **Guest Isolation Mode**
 
-- When `guestIsolation: true`, each guest only sees photos they uploaded
-- When `guestIsolation: false`, all guests see all photos (default behavior)
-- Server-side rendering shows empty gallery when isolation is enabled
+- **`false`** (default) — Shared gallery: everyone sees all photos from all guests, like a communal photo album
+- **`true`** — Private gallery: each guest only sees their own uploads, like individual photo booths
+- File storage is identical either way — uploads are always organized into per-guest folders. The setting only controls **which photos are visible** to each guest, not how they are stored
+- Server-side rendering shows empty gallery when isolation is enabled; client-side fetches the guest's photos after name entry
 
 ## 📁 Project Structure
 
