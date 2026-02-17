@@ -34,7 +34,7 @@ export function SettingsPanel() {
         <Button
           variant="ghost"
           size="sm"
-          className="h-8 w-8 px-0 rounded hover:bg-muted/50 transition-colors"
+          className="h-11 w-11 px-0 rounded hover:bg-muted/50 transition-colors"
         >
           <Settings className="h-4 w-4" />
           <span className="sr-only">{t('settings.title')}</span>

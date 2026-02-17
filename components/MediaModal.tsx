@@ -435,7 +435,7 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
                 <div
                   ref={mediaContainerRef}
                   className={`relative w-full max-w-full overflow-hidden flex items-center justify-center ${
-                    zoom === 1 && controlsVisible ? 'h-[calc(100vh-12rem)]' : 'h-[90vh]' // Full height when zoomed or controls hidden
+                    zoom === 1 && controlsVisible ? 'h-[calc(100dvh-12rem)]' : 'h-[90dvh]' // Full height when zoomed or controls hidden
                   }`}
                   onTouchStart={handleTouchStart}
                   onTouchMove={handleTouchMove}
@@ -455,10 +455,10 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
                     <div className="fixed top-2 md:top-4 right-2 md:right-5 z-20 rounded-full bg-black/50 backdrop-blur-lg p-1">
                       <button
                         onClick={onClose}
-                        className="rounded-full p-2 text-white/75 transition hover:bg-black/50 hover:text-white"
+                        className="rounded-full p-3 text-white/75 transition hover:bg-black/50 hover:text-white"
                         title={t('modal.closeModal')}
                       >
-                        <X className="h-4 w-4" />
+                        <X className="h-5 w-5" />
                       </button>
                     </div>
                   )}
@@ -472,12 +472,12 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
                             currentItem.resource_type,
                             currentItem.format
                           )}
-                          className="rounded-full p-2 text-white/75 transition hover:bg-black/50 hover:text-white"
+                          className="rounded-full p-3 text-white/75 transition hover:bg-black/50 hover:text-white"
                           target="_blank"
                           title={t('modal.openFullsize')}
                           rel="noreferrer"
                         >
-                          <ExternalLink className="h-4 w-4" />
+                          <ExternalLink className="h-5 w-5" />
                         </a>
                         <button
                           onClick={() => {
@@ -493,10 +493,10 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
                             link.click();
                             document.body.removeChild(link);
                           }}
-                          className="rounded-full p-2 text-white/75 transition hover:bg-black/50 hover:text-white"
+                          className="rounded-full p-3 text-white/75 transition hover:bg-black/50 hover:text-white"
                           title={t('modal.downloadFullsize')}
                         >
-                          <Download className="h-4 w-4" />
+                          <Download className="h-5 w-5" />
                         </button>
                       </div>
 
@@ -505,10 +505,10 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
                           <button
                             onClick={zoomOut}
                             disabled={zoom <= 0.5}
-                            className="rounded-full p-2 text-white/75 transition hover:bg-black/50 hover:text-white disabled:opacity-50"
+                            className="rounded-full p-3 text-white/75 transition hover:bg-black/50 hover:text-white disabled:opacity-50"
                             title={t('modal.zoomOut')}
                           >
-                            <ZoomOut className="h-4 w-4" />
+                            <ZoomOut className="h-5 w-5" />
                           </button>
                           <span className="px-2 text-sm text-white/90 min-w-[3rem] text-center font-medium">
                             {Math.round(zoom * 100)}%
@@ -516,18 +516,18 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
                           <button
                             onClick={zoomIn}
                             disabled={zoom >= 5}
-                            className="rounded-full p-2 text-white/75 transition hover:bg-black/50 hover:text-white disabled:opacity-50"
+                            className="rounded-full p-3 text-white/75 transition hover:bg-black/50 hover:text-white disabled:opacity-50"
                             title={t('modal.zoomIn')}
                           >
-                            <ZoomIn className="h-4 w-4" />
+                            <ZoomIn className="h-5 w-5" />
                           </button>
                           {zoom !== 1 && (
                             <button
                               onClick={resetZoom}
-                              className="rounded-full p-2 text-white/75 transition hover:bg-black/50 hover:text-white ml-0.5"
+                              className="rounded-full p-3 text-white/75 transition hover:bg-black/50 hover:text-white ml-0.5"
                               title={t('modal.resetZoom')}
                             >
-                              <RotateCcw className="h-4 w-4" />
+                              <RotateCcw className="h-5 w-5" />
                             </button>
                           )}
                         </div>
@@ -598,7 +598,7 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
 
               {zoom === 1 && controlsVisible && (
                 <div
-                  className={`fixed inset-x-0 z-60 overflow-hidden bottom-0 ${isSafariMobile ? 'ios-safari-bottom' : ''}`}
+                  className={`fixed inset-x-0 z-60 overflow-hidden bottom-0 pb-[env(safe-area-inset-bottom)] ${isSafariMobile ? 'ios-safari-bottom' : ''}`}
                 >
                   <motion.div
                     initial={false}

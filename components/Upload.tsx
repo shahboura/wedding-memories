@@ -1036,7 +1036,8 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
         size="lg"
         className="fixed bottom-14 right-4 shadow-lg hover:shadow-xl transition-all duration-200 bg-primary hover:bg-primary/90 
                    h-14 px-5 py-3 rounded-full flex items-center gap-3 text-sm font-medium
-                   md:h-12 md:px-6 md:py-3 md:rounded-lg md:gap-2 md:text-sm md:font-medium"
+                   mb-[env(safe-area-inset-bottom)]
+                   md:h-12 md:px-6 md:py-3 md:rounded-lg md:gap-2 md:text-sm md:font-medium md:mb-0"
       >
         <Camera className="h-5 w-5 md:h-5 md:w-5" />
         <span className="hidden sm:inline">{t('upload.addFiles')}</span>
@@ -1059,7 +1060,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
           <DialogTrigger asChild>
             <TriggerButton />
           </DialogTrigger>
-          <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogContent className="sm:max-w-2xl max-h-[90dvh] overflow-hidden flex flex-col">
             <DialogHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -1242,7 +1243,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
         <DrawerTrigger asChild>
           <TriggerButton />
         </DrawerTrigger>
-        <DrawerContent className="max-h-[90vh] h-[90vh] flex flex-col">
+        <DrawerContent className="max-h-[90dvh] h-[90dvh] flex flex-col">
           <DrawerHeader className="flex-shrink-0 border-b bg-background/95 backdrop-blur">
             <div className="space-y-2">
               <DrawerTitle>{t('upload.title')}</DrawerTitle>
