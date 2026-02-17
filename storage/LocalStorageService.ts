@@ -184,8 +184,8 @@ export class LocalStorageService implements StorageService {
 
         items.push({
           id: id++,
-          height: '480',
-          width: '720',
+          height: 480,
+          width: 720,
           public_id: this.getMediaUrl(relativePath),
           format: ext,
           resource_type: this.getResourceType(ext),

@@ -210,8 +210,8 @@ export class S3Service implements StorageService {
         // Return media item with presigned URL
         return {
           id: index,
-          height: '480',
-          width: '720',
+          height: 480,
+          width: 720,
           public_id: presignedUrl, // Use presigned URL as public_id
           format: format,
           resource_type: getResourceType(format),

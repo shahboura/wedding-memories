@@ -573,8 +573,8 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
           blurDataUrl: '',
           guestName: data.guestName || guestName,
           uploadDate: data.uploadDate || data.created_at,
-          height: data.height?.toString() || '480',
-          width: data.width?.toString() || '720',
+          height: data.height || 480,
+          width: data.width || 720,
           videoId: data.videoId,
           duration: data.duration,
         };

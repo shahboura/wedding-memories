@@ -4,6 +4,7 @@ import * as path from 'path';
 import { appConfig, StorageProvider } from '../../../config';
 import { storage } from '../../../storage';
 import { checkUploadRateLimit, createRateLimitHeaders } from '../../../utils/rateLimit';
+import { ValidationError } from '../../../utils/errors';
 import type { ApiErrorResponse } from '../../../utils/types';
 
 // Use App Router route segment config (not Pages Router config)
@@ -56,19 +57,6 @@ function validateMagicBytes(buffer: Uint8Array): boolean {
     if (matches) return true;
   }
   return false;
-}
-
-/**
- * Validation error class for input validation failures.
- */
-class ValidationError extends Error {
-  constructor(
-    message: string,
-    public field?: string
-  ) {
-    super(message);
-    this.name = 'ValidationError';
-  }
 }
 
 /**

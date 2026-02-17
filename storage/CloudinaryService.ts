@@ -29,7 +29,7 @@ interface CloudinaryResource {
  * - wedding/{guestName}/ (when guest isolation is used)
  */
 export class CloudinaryService implements StorageService {
-  private readonly baseFolder = 'wedding';
+  private readonly baseFolder: string;
 
   constructor() {
     cloudinary.config({
@@ -37,6 +37,7 @@ export class CloudinaryService implements StorageService {
       api_key: process.env.CLOUDINARY_API_KEY,
       api_secret: process.env.CLOUDINARY_API_SECRET,
     });
+    this.baseFolder = process.env.CLOUDINARY_FOLDER || 'wedding';
   }
 
   /**
@@ -124,8 +125,8 @@ export class CloudinaryService implements StorageService {
         (resource: CloudinaryResource, index: number) => {
           return {
             id: index,
-            height: resource.height?.toString() || '480',
-            width: resource.width?.toString() || '720',
+            height: resource.height || 480,
+            width: resource.width || 720,
             public_id: resource.public_id,
             format: resource.format,
             resource_type: resource.resource_type, // Add resource_type

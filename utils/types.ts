@@ -6,9 +6,9 @@ export interface MediaProps {
   /** Unique identifier for the media in the gallery */
   id: number;
   /** Media height in pixels */
-  height: string;
+  height: number;
   /** Media width in pixels */
-  width: string;
+  width: number;
   /** Cloudinary public ID for the media */
   public_id: string;
   /** Media file format (jpg, mp4, etc.) */

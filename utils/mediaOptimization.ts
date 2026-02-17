@@ -132,8 +132,8 @@ export function getOptimizedMediaProps(
       return {
         src: thumbnailImageSrc,
         alt: `Wedding video thumbnail${item.guestName && item.guestName !== 'Unknown Guest' ? ` shared by ${item.guestName}` : ''}`,
-        width: '180',
-        height: '120',
+        width: 180,
+        height: 120,
         sizes: getResponsiveMediaSizes(context),
         priority: false,
         loading: 'lazy' as const,

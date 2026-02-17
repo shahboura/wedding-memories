@@ -50,8 +50,8 @@ interface StorageAwareMediaProps extends Omit<MediaProps, 'id' | 'public_id'> {
 export function StorageAwareMedia({
   src,
   alt,
-  width = '720',
-  height = '480',
+  width = 720,
+  height = 480,
   resource_type,
   className,
   sizes,
@@ -69,8 +69,8 @@ export function StorageAwareMedia({
   context = 'gallery',
 }: StorageAwareMediaProps) {
   const isCloudinary = appConfig.storage === StorageProvider.Cloudinary;
-  const widthNum = parseInt(width, 10);
-  const heightNum = parseInt(height, 10);
+  const widthNum = width;
+  const heightNum = height;
   const { t } = useI18n();
 
   const [isLoading, setIsLoading] = useState(() => {

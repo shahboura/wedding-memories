@@ -366,10 +366,14 @@ function containsFileSystemUnsafeCharacters(text: string): boolean {
  * @returns True if text contains inappropriate content
  */
 function containsInappropriateContent(text: string): boolean {
-  // Basic inappropriate content check
+  // Word-boundary check to avoid false positives on real names
+  // (e.g. "Destiny" contains "test" as substring, but not as a whole word)
   const inappropriateWords = ['admin', 'test', 'null', 'undefined', 'anonymous', 'system', 'root'];
   const lowerText = text.toLowerCase();
-  return inappropriateWords.some((word) => lowerText.includes(word));
+  return inappropriateWords.some((word) => {
+    const regex = new RegExp(`\\b${word}\\b`);
+    return regex.test(lowerText);
+  });
 }
 
 /**
