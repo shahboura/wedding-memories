@@ -88,9 +88,8 @@ const TriggerButton = React.forwardRef<HTMLButtonElement, TriggerButtonProps>(
                    mb-[env(safe-area-inset-bottom)]
                    md:h-12 md:px-6 md:py-3 md:rounded-lg md:gap-2 md:text-sm md:font-medium md:mb-0"
       >
-        <Camera className="h-5 w-5 md:h-5 md:w-5" />
-        <span className="hidden sm:inline">{label}</span>
-        <span className="sm:hidden">{label}</span>
+        <Camera className="h-5 w-5" />
+        <span>{label}</span>
       </Button>
     );
   }
@@ -106,14 +105,8 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
 
   const isMediaModalOpen = useMediaModalOpen();
 
-  let photoId: string | null = null;
-  try {
-    const searchParams = useSearchParams();
-    photoId = searchParams?.get('photoId') || null;
-  } catch {
-    // Ignore search params error during SSR
-    photoId = null;
-  }
+  const searchParams = useSearchParams();
+  const photoId = searchParams?.get('photoId') || null;
 
   const isModalOpen = !!photoId || isMediaModalOpen;
   const addMedia = useAddMedia();
@@ -295,44 +288,13 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
           return;
         }
 
-        // Image files — safer approach for iOS
-
-        // Large images can be problematic with FileReader on iOS
-        // Object URL is safer in all cases
-        if (isMobile || file.size > 5 * 1024 * 1024) {
-          // Files over 5MB
-          try {
-            const objectUrl = URL.createObjectURL(file);
-            resolve(objectUrl);
-          } catch {
-            resolve('');
-          }
-          return;
+        // Image files — use object URL (lightweight pointer, no base64 copy)
+        try {
+          const objectUrl = URL.createObjectURL(file);
+          resolve(objectUrl);
+        } catch {
+          resolve('');
         }
-
-        // Desktop small files — use FileReader
-        const reader = new FileReader();
-
-        reader.onload = (e) => {
-          const result = e.target?.result;
-          if (result && typeof result === 'string') {
-            resolve(result);
-          } else {
-            resolve('');
-          }
-        };
-
-        reader.onerror = () => {
-          // Fallback to object URL
-          try {
-            const objectUrl = URL.createObjectURL(file);
-            resolve(objectUrl);
-          } catch {
-            resolve('');
-          }
-        };
-
-        reader.readAsDataURL(file);
       } catch {
         // Last resort — return empty string
         resolve('');
@@ -513,8 +475,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
   };
 
   const selectAllFiles = () => {
-    const pendingFileIds = files.filter((f) => f.status === 'pending').map((f) => f.id);
-    setSelectedFiles(new Set(pendingFileIds));
+    setSelectedFiles(new Set(pendingFiles.map((f) => f.id)));
   };
 
   const deselectAllFiles = () => {
@@ -679,7 +640,6 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
       return;
     }
 
-    const pendingFiles = files.filter((f) => f.status === 'pending');
     if (pendingFiles.length === 0) return;
 
     setIsUploading(true);
@@ -1315,7 +1275,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
             setNameError(null);
           }
         }}
-        fixed
+        repositionInputs={false}
       >
         <DrawerTrigger asChild>
           <TriggerButton label={t('upload.addFiles')} />
