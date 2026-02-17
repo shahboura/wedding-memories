@@ -17,6 +17,12 @@ RUN pnpm install --frozen-lockfile --prod=false
 # ============================================================
 FROM node:25-alpine AS builder
 
+# Build arguments for configurable values
+ARG BRIDE_NAME=Bride
+ARG GROOM_NAME=Groom
+ARG WHATSAPP_NUMBER=
+ARG STORAGE_PROVIDER=local
+
 RUN npm install -g pnpm
 
 WORKDIR /app
@@ -24,11 +30,18 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Build-time env vars (defaults for local mode; override at runtime)
-ENV STORAGE_PROVIDER=local
+# Build-time env vars (baked into the bundle)
+ENV STORAGE_PROVIDER=${STORAGE_PROVIDER}
+ENV BRIDE_NAME=${BRIDE_NAME}
+ENV GROOM_NAME=${GROOM_NAME}
+ENV WHATSAPP_NUMBER=${WHATSAPP_NUMBER}
 ENV NEXT_TELEMETRY_DISABLED=1
 # Skip env validation during build (credentials aren't available yet)
 ENV SKIP_ENV_VALIDATION=1
+
+# Run type-check and lint before building
+RUN pnpm type-check
+RUN pnpm lint
 
 RUN pnpm build
 

@@ -1,31 +1,29 @@
 services:
   wedding-memories:
-    build: .
+    build:
+      context: .
+      args:
+        # These are baked into the build at build time
+        # Changing these requires rebuilding the image
+        BRIDE_NAME: ${BRIDE_NAME:-Bride}
+        GROOM_NAME: ${GROOM_NAME:-Groom}
+        WHATSAPP_NUMBER: ${WHATSAPP_NUMBER:-}
+        STORAGE_PROVIDER: ${STORAGE_PROVIDER:-local}
     image: wedding-memories
     ports:
       - '${PORT:-3010}:3010'
     environment:
       # ---------------------------------------------------------------
-      # Storage provider: "local" | "cloudinary" | "s3"
-      # ---------------------------------------------------------------
-      - STORAGE_PROVIDER=${STORAGE_PROVIDER:-local}
-
-      # ---------------------------------------------------------------
-      # Local storage (when STORAGE_PROVIDER=local)
+      # Note: BRIDE_NAME, GROOM_NAME, WHATSAPP_NUMBER, and STORAGE_PROVIDER
+      # are baked into the image at build time via build args.
+      # The values below are for reference only and don't affect runtime.
       # ---------------------------------------------------------------
       - LOCAL_STORAGE_PATH=/app/uploads
-
-      # ---------------------------------------------------------------
-      # App configuration
-      # ---------------------------------------------------------------
-      - BRIDE_NAME=${BRIDE_NAME:-Bride}
-      - GROOM_NAME=${GROOM_NAME:-Groom}
       - GUEST_ISOLATION=${GUEST_ISOLATION:-true}
       - DEFAULT_LANGUAGE=${DEFAULT_LANGUAGE:-en}
-      - WHATSAPP_NUMBER=${WHATSAPP_NUMBER:-}
 
       # ---------------------------------------------------------------
-      # Cloudinary (when STORAGE_PROVIDER=cloudinary)
+      # Cloudinary (only needed when STORAGE_PROVIDER=cloudinary)
       # ---------------------------------------------------------------
       - NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=${NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME:-}
       - CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY:-}
@@ -33,7 +31,7 @@ services:
       - CLOUDINARY_FOLDER=${CLOUDINARY_FOLDER:-wedding}
 
       # ---------------------------------------------------------------
-      # S3 / Wasabi (when STORAGE_PROVIDER=s3)
+      # S3 / Wasabi (only needed when STORAGE_PROVIDER=s3)
       # ---------------------------------------------------------------
       - AWS_REGION=${AWS_REGION:-}
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}

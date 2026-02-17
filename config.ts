@@ -13,6 +13,8 @@ export enum Language {
 /**
  * Resolves the storage provider from the STORAGE_PROVIDER env var,
  * falling back to the hardcoded default.
+ *
+ * These env vars are baked into the bundle at build time via Dockerfile.
  */
 function resolveStorageProvider(): StorageProvider {
   const envValue = process.env.STORAGE_PROVIDER?.toLowerCase();
