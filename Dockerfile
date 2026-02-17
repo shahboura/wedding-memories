@@ -68,19 +68,13 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Run as non-root for security
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
-
 # Copy standalone output
 COPY --from=builder /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
 
 # Create uploads directory for local storage
-RUN mkdir -p /app/uploads && chown nextjs:nodejs /app/uploads
-
-USER nextjs
+RUN mkdir -p /app/uploads
 
 EXPOSE 3010
 
