@@ -44,7 +44,7 @@ export async function POST(request: NextRequest): Promise<
 
     const uploadPayload = await parseMultipartRequest(request);
 
-    const rateLimitResult = checkUploadRateLimit(request, uploadPayload.guestName);
+    const rateLimitResult = await checkUploadRateLimit(request, uploadPayload.guestName);
     if (!rateLimitResult.success) {
       const errorResponse: ApiErrorResponse = {
         error: 'Too many uploads',

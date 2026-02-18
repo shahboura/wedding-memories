@@ -1,5 +1,3 @@
-import { createHash } from 'crypto';
-
 const EVENT_TOKEN_ENV = process.env.EVENT_TOKEN?.trim() ?? '';
 
 export const EVENT_TOKEN_HEADER = 'x-event-token';
@@ -45,9 +43,13 @@ export function isEventTokenValid(request: Request): boolean {
   return !!providedToken && providedToken === EVENT_TOKEN_ENV;
 }
 
-export function getEventTokenForRateLimit(request: Request): string | null {
+export async function getEventTokenForRateLimit(request: Request): Promise<string | null> {
   const token = getEventTokenFromRequest(request);
   if (!token) return null;
+  // Dynamic import: crypto is only available in Node.js runtime (API routes),
+  // not in the Edge runtime where proxy.ts runs. Keeping this import lazy
+  // prevents the module from failing when imported by the proxy.
+  const { createHash } = await import('crypto');
   return createHash('sha256').update(token).digest('hex');
 }
 

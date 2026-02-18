@@ -46,7 +46,7 @@ export async function GET(
     }
 
     // Rate limit check
-    const rateLimitResult = checkPhotosRateLimit(request);
+    const rateLimitResult = await checkPhotosRateLimit(request);
     if (!rateLimitResult.success) {
       const errorResponse: ApiErrorResponse = {
         error: 'Too many requests',

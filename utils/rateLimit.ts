@@ -214,9 +214,9 @@ function getClientIdentifier(request: Request): string {
   return 'unknown';
 }
 
-function getRateLimitIdentifier(request: Request): string {
+async function getRateLimitIdentifier(request: Request): Promise<string> {
   const ipIdentifier = getClientIdentifier(request);
-  const eventToken = getEventTokenForRateLimit(request);
+  const eventToken = await getEventTokenForRateLimit(request);
 
   if (eventToken) {
     return `${eventToken}:${ipIdentifier}`;
@@ -229,8 +229,8 @@ function normalizeGuestName(guestName: string): string {
   return guestName.trim().toLowerCase();
 }
 
-function getUploadRateLimitIdentifier(request: Request, guestName: string): string {
-  const eventToken = getEventTokenForRateLimit(request);
+async function getUploadRateLimitIdentifier(request: Request, guestName: string): Promise<string> {
+  const eventToken = await getEventTokenForRateLimit(request);
   const normalizedGuest = normalizeGuestName(guestName);
   if (eventToken) {
     return `${eventToken}:guest=${normalizedGuest}`;
@@ -242,8 +242,8 @@ function getUploadRateLimitIdentifier(request: Request, guestName: string): stri
  * Photos API rate limiting
  * Prevents scraping/abuse of the gallery listing endpoint
  */
-export function checkPhotosRateLimit(request: Request): RateLimitResult {
-  const identifier = getRateLimitIdentifier(request);
+export async function checkPhotosRateLimit(request: Request): Promise<RateLimitResult> {
+  const identifier = await getRateLimitIdentifier(request);
   return photosRateLimit.check(identifier);
 }
 
@@ -251,13 +251,15 @@ export function checkPhotosRateLimit(request: Request): RateLimitResult {
  * Enhanced upload rate limiting
  * Prevents sustained abuse while being generous for normal wedding use
  */
-export function checkUploadRateLimit(
+export async function checkUploadRateLimit(
   request: Request,
   guestName: string
-): RateLimitResult & {
-  message?: string;
-} {
-  const identifier = getUploadRateLimitIdentifier(request, guestName);
+): Promise<
+  RateLimitResult & {
+    message?: string;
+  }
+> {
+  const identifier = await getUploadRateLimitIdentifier(request, guestName);
 
   const result = uploadRateLimit.check(identifier);
   if (!result.success) {
