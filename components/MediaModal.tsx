@@ -419,13 +419,10 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
       if (isVideo) return;
-      e.preventDefault();
-
+      // No preventDefault needed — modal is full-screen, nothing to scroll behind it
       if (e.deltaY < 0) {
-        // Zoom in
         zoomIn();
       } else {
-        // Zoom out
         zoomOut();
       }
     },
