@@ -103,6 +103,19 @@ Summaries should be added to this AGENTS.md file under a "Session Summaries" sec
 
 ## Session Summaries
 
+### 2026-02-19 23:30 - Dead code cleanup and blur pipeline connection
+
+**Agent:** orchestrator  
+**Summary:** Comprehensive refactor-only pass removing dead code, cloud remnants, and connecting the blur placeholder pipeline.
+
+- Deleted `imageUrl.ts` entirely (all exports dead/identity); removed `StorageProvider` enum and `storage` config; simplified storage factory to direct `LocalStorageService` singleton
+- Connected blur data pipeline end-to-end: `blurDataURL` now flows from upload → metadata → gallery → `<Image unoptimized placeholder="blur">` (was previously discarded as `_blurDataUrl`)
+- Removed dead store state (`isUploadModalOpen`, `lastRefreshTime` → `refreshCounter`), narrowed `selectedMediaId` to `number | null`
+- Extracted shared utilities: `getPhotosApiUrl()` in `clientUtils.ts`, `isMobileDevice()` in new `utils/device.ts`
+- Cleaned dead code across Upload.tsx (dead props, useSearchParams), MediaModal.tsx (duplicate variant, dead wrappers), MediaGallery.tsx (unreachable render branch), LocalStorageService.ts (dead ID counter)
+- Net -119 lines across 16 files; zero type errors, zero lint warnings
+- **Explicitly skipped:** Upload footer extraction (layout risk), centralize fetching (too large), video poster ffmpeg (50MB Docker bloat)
+
 ### 2026-02-19 21:45 - Compose passes EVENT_TOKEN
 
 **Agent:** orchestrator  
