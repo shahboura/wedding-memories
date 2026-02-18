@@ -21,6 +21,10 @@ services:
       # ---------------------------------------------------------------
       - LOCAL_STORAGE_PATH=/app/uploads
       - EVENT_TOKEN=${EVENT_TOKEN:-}
+      - RATE_LIMIT_UPLOAD_WINDOW_MS=${RATE_LIMIT_UPLOAD_WINDOW_MS:-300000}
+      - RATE_LIMIT_UPLOAD_MAX=${RATE_LIMIT_UPLOAD_MAX:-60}
+      - RATE_LIMIT_PHOTOS_WINDOW_MS=${RATE_LIMIT_PHOTOS_WINDOW_MS:-60000}
+      - RATE_LIMIT_PHOTOS_MAX=${RATE_LIMIT_PHOTOS_MAX:-60}
 
     volumes:
       # Persist uploaded media across container restarts.
