@@ -51,8 +51,8 @@ export class LocalStorageService implements StorageService {
     return `/api/media/${relativePath}`;
   }
 
-  private getMetaPath(absolutePath: string): string {
-    return `${absolutePath}.meta.json`;
+  private getMetaPath(absoluteDir: string, baseName: string): string {
+    return path.join(absoluteDir, 'meta', `${baseName}.json`);
   }
 
   private async generateImageAssets(
@@ -125,7 +125,8 @@ export class LocalStorageService implements StorageService {
       blurDataUrl = result.blurDataUrl;
     }
 
-    const metaPath = this.getMetaPath(absolutePath);
+    const metaPath = this.getMetaPath(absoluteDir, baseName);
+    await this.ensureDir(path.dirname(metaPath));
     await fs.writeFile(
       metaPath,
       JSON.stringify({ width, height, blurDataUrl, format: fileExtension }, null, 2)
@@ -227,7 +228,7 @@ export class LocalStorageService implements StorageService {
         if (
           normalizedPath.includes('/thumb/') ||
           normalizedPath.includes('/medium/') ||
-          normalizedPath.endsWith('.meta.json')
+          normalizedPath.includes('/meta/')
         ) {
           continue;
         }
@@ -244,7 +245,8 @@ export class LocalStorageService implements StorageService {
         let height = 480;
         let blurDataUrl: string | undefined;
         if (this.getResourceType(ext) === 'image') {
-          const metaPath = this.getMetaPath(fullPath);
+          const baseName = path.basename(fullPath, path.extname(fullPath));
+          const metaPath = this.getMetaPath(path.dirname(fullPath), baseName);
           try {
             const metaRaw = await fs.readFile(metaPath, 'utf-8');
             const meta = JSON.parse(metaRaw) as {
@@ -289,7 +291,8 @@ export class LocalStorageService implements StorageService {
     await this.ensureDir(absoluteDir);
     await fs.writeFile(absolutePath, buffer);
 
-    const metaPath = this.getMetaPath(absolutePath);
+    const metaPath = this.getMetaPath(absoluteDir, baseName);
+    await this.ensureDir(path.dirname(metaPath));
     await fs.writeFile(
       metaPath,
       JSON.stringify({ width: 720, height: 480, blurDataUrl: '', format: fileExtension }, null, 2)
