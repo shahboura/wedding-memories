@@ -17,7 +17,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
   }
 
-  const response = NextResponse.redirect(new URL('/', request.url));
+  const response = NextResponse.redirect(new URL('/', request.nextUrl.origin));
   const cookieHeader = getEventTokenCookieHeader();
   if (cookieHeader) {
     response.headers.set('Set-Cookie', cookieHeader);
