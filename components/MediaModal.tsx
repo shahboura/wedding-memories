@@ -15,7 +15,7 @@ import {
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
 import { StorageAwareMedia } from './StorageAwareMedia';
-import { useState, useEffect, useCallback, useRef, useMemo, type RefCallback } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useKeypress } from '../hooks/useKeypress';
 import { useSwipeable } from 'react-swipeable';
 import {
@@ -66,24 +66,46 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const mediaContainerRef = useRef<HTMLDivElement>(null);
 
-  // Filmstrip ref callback for native scroll centering
-  const activeThumbRef: RefCallback<HTMLButtonElement> = useCallback(
-    (node: HTMLButtonElement | null) => {
+  // ── Filmstrip native scroll ──────────────────────────────────────────
+  const filmstripRef = useRef<HTMLDivElement>(null);
+  const filmstripHasScrolled = useRef(false);
+  // Suppress scroll-driven index updates during programmatic scrollIntoView
+  const isProgrammaticScroll = useRef(false);
+  // Map of index → button element for nearest-center lookup on user scroll
+  const thumbElements = useRef<Map<number, HTMLButtonElement>>(new Map());
+
+  // Combined ref callback: stores every button in thumbElements,
+  // and scrolls the active one into view when currentIndex changes.
+  const thumbRefCallback = useCallback(
+    (index: number) => (node: HTMLButtonElement | null) => {
+      // Maintain the element map for scroll-position lookup
       if (node) {
-        // Scroll the active thumbnail into the center of the filmstrip.
-        // Use 'instant' on first render (modal open), 'smooth' on navigation.
+        thumbElements.current.set(index, node);
+      } else {
+        thumbElements.current.delete(index);
+      }
+
+      // Scroll the active thumbnail into the center of the filmstrip
+      if (node && index === currentIndex) {
+        const isFirstScroll = !filmstripHasScrolled.current;
+        isProgrammaticScroll.current = true;
         node.scrollIntoView({
-          behavior: filmstripHasScrolled.current ? 'smooth' : 'instant',
+          behavior: isFirstScroll ? 'instant' : 'smooth',
           inline: 'center',
           block: 'nearest',
         });
         filmstripHasScrolled.current = true;
+        // Release the guard after the scroll animation settles
+        setTimeout(
+          () => {
+            isProgrammaticScroll.current = false;
+          },
+          isFirstScroll ? 0 : 350
+        );
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [currentIndex]
   );
-  const filmstripHasScrolled = useRef(false);
 
   // UI state
   const [controlsVisible, setControlsVisible] = useState(true);
@@ -210,6 +232,55 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
     },
     [resetView]
   );
+
+  // Sync currentIndex when user manually scrolls the filmstrip to a new snap position
+  useEffect(() => {
+    const container = filmstripRef.current;
+    if (!container) return;
+
+    const findCenteredIndex = () => {
+      if (isProgrammaticScroll.current) return;
+
+      const containerRect = container.getBoundingClientRect();
+      const centerX = containerRect.left + containerRect.width / 2;
+
+      let closestIndex = currentIndex;
+      let closestDistance = Infinity;
+
+      thumbElements.current.forEach((el, index) => {
+        const rect = el.getBoundingClientRect();
+        const elCenterX = rect.left + rect.width / 2;
+        const distance = Math.abs(elCenterX - centerX);
+        if (distance < closestDistance) {
+          closestDistance = distance;
+          closestIndex = index;
+        }
+      });
+
+      if (closestIndex !== currentIndex) {
+        changeMediaIndex(closestIndex);
+      }
+    };
+
+    // scrollend fires once after scroll + snap settles (Chrome 114+, FF 109+, Safari 18+).
+    // Debounced scroll fallback for older browsers.
+    let scrollTimer: ReturnType<typeof setTimeout>;
+    const useScrollend = 'onscrollend' in window;
+    const eventName = useScrollend ? 'scrollend' : 'scroll';
+
+    const handler = useScrollend
+      ? findCenteredIndex
+      : () => {
+          clearTimeout(scrollTimer);
+          scrollTimer = setTimeout(findCenteredIndex, 150);
+        };
+
+    container.addEventListener(eventName, handler, { passive: true });
+    return () => {
+      container.removeEventListener(eventName, handler);
+      clearTimeout(scrollTimer);
+    };
+  }, [currentIndex, changeMediaIndex]);
 
   // Prefetch adjacent media for faster switching
   // Uses <link rel="prefetch"> instead of hidden <video> elements to avoid
@@ -666,6 +737,7 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
                   className={`fixed inset-x-0 z-60 bottom-0 pb-[env(safe-area-inset-bottom)] ${isSafariMobile ? 'ios-safari-bottom' : ''}`}
                 >
                   <div
+                    ref={filmstripRef}
                     className="mt-0 md:mt-6 flex items-center overflow-x-auto scrollbar-hide"
                     style={{
                       WebkitOverflowScrolling: 'touch',
@@ -683,7 +755,7 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
                       const isVideoThumb = item.resource_type === 'video';
                       return (
                         <motion.button
-                          ref={index === currentIndex ? activeThumbRef : undefined}
+                          ref={thumbRefCallback(index)}
                           animate={{ scale: index === currentIndex ? 1.15 : 1 }}
                           transition={{ duration: 0.15 }}
                           onClick={() => changeMediaIndex(index)}
