@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { storage } from '../../../storage';
 import { appConfig } from '../../../config';
 import { checkPhotosRateLimit, createRateLimitHeaders } from '../../../utils/rateLimit';
-import { isEventTokenRequired, isEventTokenValid } from '../../../utils/eventToken';
+import {
+  getEventTokenCookieHeader,
+  isEventTokenRequired,
+  isEventTokenValid,
+} from '../../../utils/eventToken';
 import type { MediaProps, ApiErrorResponse } from '../../../utils/types';
 
 /**
@@ -64,12 +68,19 @@ export async function GET(
     // Fetch photos from storage provider
     const photos = await storage.list(guestFilter || undefined);
 
+    const headers: Record<string, string> = {
+      'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
+      ...createRateLimitHeaders(rateLimitResult),
+    };
+
+    const eventCookieHeader = getEventTokenCookieHeader();
+    if (eventCookieHeader) {
+      headers['Set-Cookie'] = eventCookieHeader;
+    }
+
     return NextResponse.json(photos, {
       status: 200,
-      headers: {
-        'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
-        ...createRateLimitHeaders(rateLimitResult),
-      },
+      headers,
     });
   } catch (error) {
     console.error('Failed to fetch wedding photos:', error);

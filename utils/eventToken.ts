@@ -1,3 +1,5 @@
+import { createHash } from 'crypto';
+
 const EVENT_TOKEN_ENV = process.env.EVENT_TOKEN?.trim() ?? '';
 
 export const EVENT_TOKEN_HEADER = 'x-event-token';
@@ -44,5 +46,24 @@ export function isEventTokenValid(request: Request): boolean {
 }
 
 export function getEventTokenForRateLimit(request: Request): string | null {
-  return getEventTokenFromRequest(request);
+  const token = getEventTokenFromRequest(request);
+  if (!token) return null;
+  return createHash('sha256').update(token).digest('hex');
+}
+
+export function getEventTokenCookieHeader(): string | null {
+  if (!isEventTokenRequired()) return null;
+
+  const parts = [
+    `${EVENT_TOKEN_COOKIE}=${encodeURIComponent(EVENT_TOKEN_ENV)}`,
+    'Path=/',
+    'HttpOnly',
+    'SameSite=Lax',
+  ];
+
+  if (process.env.NODE_ENV === 'production') {
+    parts.push('Secure');
+  }
+
+  return parts.join('; ');
 }

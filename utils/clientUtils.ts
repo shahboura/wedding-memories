@@ -40,22 +40,3 @@ export function getCompressionInfo(fileSizeBytes: number): {
     estimatedSizeReduction: `~${estimatedReduction}%`,
   };
 }
-
-export function getEventToken(): string | null {
-  if (typeof window === 'undefined') return null;
-
-  const fromStorage = window.localStorage.getItem('event_token');
-  if (fromStorage && fromStorage.trim()) return fromStorage.trim();
-
-  const cookieMatch = document.cookie
-    .split(';')
-    .map((part) => part.trim())
-    .find((part) => part.startsWith('event_token='));
-
-  if (cookieMatch) {
-    const value = cookieMatch.split('=')[1];
-    if (value) return decodeURIComponent(value);
-  }
-
-  return null;
-}

@@ -3,7 +3,11 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { storage } from '../../../storage';
 import { checkUploadRateLimit, createRateLimitHeaders } from '../../../utils/rateLimit';
-import { isEventTokenRequired, isEventTokenValid } from '../../../utils/eventToken';
+import {
+  getEventTokenCookieHeader,
+  isEventTokenRequired,
+  isEventTokenValid,
+} from '../../../utils/eventToken';
 import { ValidationError } from '../../../utils/errors';
 import type { ApiErrorResponse } from '../../../utils/types';
 
@@ -220,9 +224,17 @@ export async function POST(request: NextRequest): Promise<
       uploadDate: uploadResult.created_at,
     };
 
+    const headers: Record<string, string> = {
+      ...createRateLimitHeaders(rateLimitResult),
+    };
+    const eventCookieHeader = getEventTokenCookieHeader();
+    if (eventCookieHeader) {
+      headers['Set-Cookie'] = eventCookieHeader;
+    }
+
     return NextResponse.json(mediaData, {
       status: 201,
-      headers: createRateLimitHeaders(rateLimitResult),
+      headers,
     });
   } catch (error) {
     console.error('Upload error:', error);
