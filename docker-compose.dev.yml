@@ -10,6 +10,7 @@ services:
     command: pnpm dev
     environment:
       - NODE_ENV=development
+      - EVENT_TOKEN=${EVENT_TOKEN:-}
     volumes:
       # Mount source code for hot-reload
       - .:/app

@@ -20,6 +20,7 @@ services:
       # JS bundle at build time.
       # ---------------------------------------------------------------
       - LOCAL_STORAGE_PATH=/app/uploads
+      - EVENT_TOKEN=${EVENT_TOKEN:-}
 
     volumes:
       # Persist uploaded media across container restarts.
