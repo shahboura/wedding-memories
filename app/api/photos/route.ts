@@ -24,7 +24,7 @@ function validateGuestFilter(guestFilter: string | null): void {
 /**
  * Handles GET requests to fetch wedding photos.
  *
- * This endpoint provides a list of photos with metadata from the configured storage provider,
+ * This endpoint provides a list of photos with metadata from local storage,
  * with optional filtering based on guest isolation settings.
  *
  * Query parameters:
@@ -65,7 +65,7 @@ export async function GET(
     // Validate guest filter requirements
     validateGuestFilter(guestFilter);
 
-    // Fetch photos from storage provider
+    // Fetch photos from storage
     const photos = await storage.list(guestFilter || undefined);
 
     const headers: Record<string, string> = {

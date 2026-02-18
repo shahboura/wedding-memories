@@ -1,30 +1,18 @@
 /**
  * Storage-aware media component for local storage.
  *
- * Uses direct img/video tags to avoid Next.js image optimization.
+ * Images use Next.js <Image unoptimized> to get blur placeholders and layout
+ * shift prevention without double-optimization (sharp already generates WebP
+ * variants at upload time). Modal images use raw <img> for pinch-zoom
+ * compatibility. Videos use native <video> elements.
  */
 
+import Image from 'next/image';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useI18n } from './I18nProvider';
 import type { MediaProps } from '../utils/types';
+import { isMobileDevice } from '../utils/device';
 import { Play, Video } from 'lucide-react';
-
-let _cachedIsMobile: boolean | null = null;
-
-const isMobileDevice = () => {
-  if (typeof window === 'undefined') return false;
-  if (_cachedIsMobile === null) {
-    _cachedIsMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-      navigator.userAgent
-    );
-  }
-  return _cachedIsMobile;
-};
-
-const isDesktopDevice = () => {
-  if (typeof window === 'undefined') return true;
-  return !isMobileDevice();
-};
 
 interface StorageAwareMediaProps extends Omit<MediaProps, 'id' | 'public_id'> {
   src: string;
@@ -42,6 +30,10 @@ interface StorageAwareMediaProps extends Omit<MediaProps, 'id' | 'public_id'> {
   poster?: string;
   controls?: boolean;
   context?: 'gallery' | 'modal' | 'thumb';
+  /** Next.js Image placeholder mode */
+  placeholder?: 'blur' | 'empty';
+  /** Base64 blur data URL for Next.js Image blur placeholder */
+  blurDataURL?: string;
 }
 
 export function StorageAwareMedia({
@@ -51,9 +43,11 @@ export function StorageAwareMedia({
   height = 480,
   resource_type,
   className,
-  sizes: _sizes,
+  sizes,
   priority = false,
-  blurDataUrl: _blurDataUrl,
+  blurDataUrl,
+  blurDataURL,
+  placeholder: _placeholder,
   style,
   onClick,
   onMouseEnter,
@@ -69,6 +63,9 @@ export function StorageAwareMedia({
   const heightNum = height;
   const { t } = useI18n();
 
+  // Resolve blur data URL from either source (Next.js convention or MediaProps)
+  const resolvedBlurDataURL = blurDataURL || blurDataUrl;
+
   const [isLoading, setIsLoading] = useState(() => {
     if (typeof window === 'undefined') return false;
     // For modal context, don't show loading state initially
@@ -80,18 +77,17 @@ export function StorageAwareMedia({
   const containerRef = useRef<HTMLDivElement>(null);
   const hasRequestedLoadRef = useRef(false);
   const [loadError, setLoadError] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-  const [isDesktop, setIsDesktop] = useState(true);
+  const [isMobile] = useState(isMobileDevice);
+  const isDesktop = !isMobile;
   const [hasFrame, setHasFrame] = useState(false);
+  const srcRef = useRef(src);
   const isGalleryView = context === 'gallery' ? !controls : false;
   const isThumb = context === 'thumb';
 
+  // Keep srcRef in sync with current src (must be in effect, not render)
   useEffect(() => {
-    const mobile = isMobileDevice();
-    const desktop = isDesktopDevice();
-    setIsMobile(mobile);
-    setIsDesktop(desktop);
-  }, []);
+    srcRef.current = src;
+  }, [src]);
 
   useEffect(() => {
     hasRequestedLoadRef.current = false;
@@ -225,7 +221,7 @@ export function StorageAwareMedia({
       video.removeEventListener('playing', handlePlaying);
       video.removeEventListener('error', handleError);
     };
-  }, [resource_type, isGalleryView, context, src]);
+  }, [resource_type, context, src]);
 
   const handlePlay = () => {
     const video = videoRef.current;
@@ -363,8 +359,10 @@ export function StorageAwareMedia({
             }
           }}
           onSeeked={() => {
-            // First frame has been rendered — hide the placeholder overlay
-            if (context !== 'modal') {
+            // First frame has been rendered — hide the placeholder overlay.
+            // Guard against stale events: if src changed while seeking,
+            // the IntersectionObserver effect already reset hasFrame to false.
+            if (context !== 'modal' && videoRef.current?.src.endsWith(srcRef.current)) {
               setHasFrame(true);
             }
           }}
@@ -413,24 +411,25 @@ export function StorageAwareMedia({
           : { aspectRatio: `${widthNum}/${heightNum}` }
       }
     >
-      {/* Loading skeleton */}
-      {isLoading && (
+      {/* Loading skeleton — hidden when blur placeholder is available */}
+      {isLoading && !resolvedBlurDataURL && (
         <div className="absolute inset-0 bg-gray-200 dark:bg-gray-800 animate-pulse rounded-lg" />
       )}
 
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
+      <Image
+        unoptimized
         src={src}
         alt={alt}
         width={widthNum}
         height={heightNum}
+        sizes={sizes}
+        priority={priority}
         className={`${className} ${isLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
         style={{
           objectFit: 'contain',
           objectPosition: 'center',
           ...style,
         }}
-        loading={priority ? 'eager' : 'lazy'}
         onClick={onClick}
         onMouseEnter={onMouseEnter}
         tabIndex={tabIndex}
@@ -439,8 +438,10 @@ export function StorageAwareMedia({
           setIsLoading(false);
           onLoad?.();
         }}
-        onLoadStart={() => setIsLoading(true)}
         draggable={draggable}
+        {...(resolvedBlurDataURL
+          ? { placeholder: 'blur' as const, blurDataURL: resolvedBlurDataURL }
+          : {})}
       />
     </div>
   );

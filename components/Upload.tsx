@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { appConfig } from '../config';
+import { isMobileDevice } from '../utils/device';
 
 import { Button } from './ui/button';
 import {
@@ -60,10 +61,9 @@ import {
 } from '@/components/ui/dialog';
 
 import type { UploadFile } from '../utils/types';
-import { formatFileSize, getCompressionInfo } from '../utils/clientUtils';
+import { formatFileSize, getCompressionInfo, getPhotosApiUrl } from '../utils/clientUtils';
 import { getVideoMetadata, uploadWithXHR } from '../utils/uploadClient';
 import { useI18n } from './I18nProvider';
-import { useSearchParams } from 'next/navigation';
 
 /** Revoke blob/object URLs used as thumbnails to prevent memory leaks. */
 const revokeThumbnails = (filesToRevoke: UploadFile[]) => {
@@ -97,20 +97,11 @@ const TriggerButton = React.forwardRef<HTMLButtonElement, TriggerButtonProps>(
   }
 );
 
-interface UploadProps {
-  currentGuestName?: string;
-}
-
-export const Upload = ({ currentGuestName }: UploadProps) => {
+export const Upload = () => {
   const guestName = useGuestName();
   const setGuestName = useSetGuestName();
 
-  const isMediaModalOpen = useMediaModalOpen();
-
-  const searchParams = useSearchParams();
-  const photoId = searchParams?.get('photoId') || null;
-
-  const isModalOpen = !!photoId || isMediaModalOpen;
+  const isModalOpen = useMediaModalOpen();
   const setMedia = useSetMedia();
   const refreshMedia = useRefreshMedia();
   const { t } = useI18n();
@@ -144,12 +135,6 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
   useEffect(() => {
     filesRef.current = files;
   }, [files]);
-
-  useEffect(() => {
-    if (currentGuestName && currentGuestName !== guestName) {
-      setGuestName(currentGuestName);
-    }
-  }, [currentGuestName, guestName, setGuestName]);
 
   useEffect(() => {
     let rafId: number;
@@ -203,7 +188,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
   const createThumbnail = (file: File): Promise<string> => {
     return new Promise((resolve) => {
       try {
-        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        const isMobile = isMobileDevice();
 
         if (file.type.startsWith('video/')) {
           if (isMobile) {
@@ -614,14 +599,10 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
     // (empty blurDataUrl, missing video thumbnails, client-generated IDs).
     if (successCount > 0) {
       try {
-        let url = '/api/photos';
-        if (appConfig.guestIsolation && guestName) {
-          url += `?guest=${encodeURIComponent(guestName)}`;
-        }
         refreshAbortRef.current?.abort();
         const controller = new AbortController();
         refreshAbortRef.current = controller;
-        const response = await fetch(url, {
+        const response = await fetch(getPhotosApiUrl(guestName), {
           cache: 'no-store', // avoid stale ISR cache after upload (prevents empty gallery)
           signal: controller.signal,
         });
@@ -691,7 +672,6 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
   const pendingCount = files.filter((f) => f.status === 'pending').length;
   const uploadingCount = files.filter((f) => f.status === 'uploading').length;
   const successCount = lastUploadSuccessCount;
-  const hasSuccessfulUploads = lastUploadSuccessCount > 0;
   const pendingFiles = files.filter((f) => f.status === 'pending');
   const selectedPendingFiles = pendingFiles.filter((f) => selectedFiles.has(f.id));
   const allPendingSelected =
@@ -891,9 +871,10 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
                         <Image
                           src={uploadFile.thumbnail}
                           alt={uploadFile.file.name}
-                          width={100}
-                          height={100}
+                          width={96}
+                          height={96}
                           className="w-full h-full object-cover transition-all duration-200"
+                          unoptimized
                         />
                       )
                     ) : uploadFile.file.type.startsWith('video/') ? (
@@ -1087,7 +1068,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
             {uploadContent}
 
             <DialogFooter className="flex-shrink-0">
-              {hasSuccessfulUploads && pendingCount === 0 ? (
+              {successCount > 0 && pendingCount === 0 ? (
                 // Show "View Gallery" and "Close" when uploads are complete
                 <div className="grid grid-cols-2 gap-2 w-full">
                   <Button variant="outline" onClick={() => setIsOpen(false)}>
@@ -1331,7 +1312,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
           <div className="flex-1 flex flex-col min-h-0">{uploadContent}</div>
 
           <DrawerFooter className="flex-shrink-0 border-t bg-background/95 backdrop-blur">
-            {hasSuccessfulUploads && pendingCount === 0 ? (
+            {successCount > 0 && pendingCount === 0 ? (
               // Show "View Gallery" and "Close" when uploads are complete
               <div className="grid grid-cols-2 gap-2">
                 <DrawerClose asChild>

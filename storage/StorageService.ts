@@ -28,12 +28,11 @@ export interface UploadSource {
 /**
  * Storage service interface for wedding photo management.
  *
- * Provides a unified interface for storage providers
- * (local filesystem by default).
+ * Implemented by LocalStorageService (local filesystem).
  */
 export interface StorageService {
   /**
-   * Uploads a file to the storage provider.
+   * Uploads a file to storage.
    *
    * @param file - The file to upload
    * @param guestName - Optional guest name for file organization
@@ -42,7 +41,7 @@ export interface StorageService {
   upload(file: File, guestName?: string, metadata?: UploadMetadata): Promise<UploadResult>;
 
   /**
-   * Uploads a local file (streamed) to the storage provider.
+   * Uploads a local file (streamed) to storage.
    *
    * @param source - Local file reference and metadata
    * @param guestName - Optional guest name for file organization
@@ -56,7 +55,7 @@ export interface StorageService {
   ): Promise<UploadResult>;
 
   /**
-   * Lists all photos from the storage provider with metadata.
+   * Lists all photos from storage with metadata.
    *
    * @param guestName - Optional guest name to filter photos
    * @returns Promise that resolves to an array of photo data with metadata

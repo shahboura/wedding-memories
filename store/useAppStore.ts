@@ -10,15 +10,11 @@ interface AppState {
   setMedia: (media: MediaProps[]) => void;
 
   isMediaModalOpen: boolean;
-  selectedMediaId: number | string | null;
-  openMediaModal: (id: number | string) => void;
+  selectedMediaId: number | null;
+  openMediaModal: (id: number) => void;
   closeMediaModal: () => void;
 
-  isUploadModalOpen: boolean;
-  openUploadModal: () => void;
-  closeUploadModal: () => void;
-
-  lastRefreshTime: Date;
+  refreshCounter: number;
   isLoadingMedia: boolean;
   setIsLoadingMedia: (loading: boolean) => void;
   refreshMedia: () => void;
@@ -37,7 +33,7 @@ const useAppStore = create<AppState>()(
 
       isMediaModalOpen: false,
       selectedMediaId: null,
-      openMediaModal: (id: number | string) =>
+      openMediaModal: (id: number) =>
         set({
           isMediaModalOpen: true,
           selectedMediaId: id,
@@ -48,14 +44,10 @@ const useAppStore = create<AppState>()(
           selectedMediaId: null,
         }),
 
-      isUploadModalOpen: false,
-      openUploadModal: () => set({ isUploadModalOpen: true }),
-      closeUploadModal: () => set({ isUploadModalOpen: false }),
-
-      lastRefreshTime: new Date(),
+      refreshCounter: 0,
       isLoadingMedia: false,
       setIsLoadingMedia: (loading: boolean) => set({ isLoadingMedia: loading }),
-      refreshMedia: () => set({ lastRefreshTime: new Date() }),
+      refreshMedia: () => set((state) => ({ refreshCounter: state.refreshCounter + 1 })),
 
       _hasHydrated: false,
     }),
@@ -84,7 +76,7 @@ export const useOpenMediaModal = () => useAppStore((state) => state.openMediaMod
 export const useCloseMediaModal = () => useAppStore((state) => state.closeMediaModal);
 
 export const useIsLoadingMedia = () => useAppStore((state) => state.isLoadingMedia);
-export const useLastRefreshTime = () => useAppStore((state) => state.lastRefreshTime);
+export const useRefreshCounter = () => useAppStore((state) => state.refreshCounter);
 export const useSetIsLoadingMedia = () => useAppStore((state) => state.setIsLoadingMedia);
 export const useRefreshMedia = () => useAppStore((state) => state.refreshMedia);
 export const useHasHydrated = () => useAppStore((state) => state._hasHydrated);

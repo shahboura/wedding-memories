@@ -2,6 +2,19 @@
  * Client-side utility functions that don't require Node.js dependencies
  */
 
+import { appConfig } from '../config';
+
+/**
+ * Builds the /api/photos URL with optional guest isolation query param.
+ */
+export function getPhotosApiUrl(guestName?: string): string {
+  let url = '/api/photos';
+  if (appConfig.guestIsolation && guestName) {
+    url += `?guest=${encodeURIComponent(guestName)}`;
+  }
+  return url;
+}
+
 /**
  * Formats file size in bytes to human-readable format
  */

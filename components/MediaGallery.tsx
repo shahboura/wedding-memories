@@ -6,7 +6,7 @@ import { appConfig } from '../config';
 import { getOptimizedMediaProps, prefetchMediaOnInteraction } from '../utils/mediaOptimization';
 import { StorageAwareMedia } from './StorageAwareMedia';
 import dynamic from 'next/dynamic';
-import { GuestNameForm } from './GuestNameForm';
+import { getPhotosApiUrl } from '../utils/clientUtils';
 
 const MediaModal = dynamic(() => import('./MediaModal'), { ssr: false });
 
@@ -18,11 +18,10 @@ import {
   useOpenMediaModal,
   useCloseMediaModal,
   useIsLoadingMedia,
-  useLastRefreshTime,
+  useRefreshCounter,
   useSetIsLoadingMedia,
   useRefreshMedia,
   useGuestName,
-  useHasHydrated,
 } from '../store/useAppStore';
 import { useI18n } from './I18nProvider';
 
@@ -47,8 +46,8 @@ function formatUploadDate(dateString: string, locale: string = 'en-US'): string 
 
 function handleMediaKeyNavigation(
   event: React.KeyboardEvent,
-  mediaId: number | string,
-  onOpenModal: (id: number | string) => void
+  mediaId: number,
+  onOpenModal: (id: number) => void
 ): void {
   if (event.key === 'Enter' || event.key === ' ') {
     event.preventDefault();
@@ -64,11 +63,10 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
   const openModal = useOpenMediaModal();
   const closeModal = useCloseMediaModal();
   const isLoading = useIsLoadingMedia();
-  const lastRefreshTime = useLastRefreshTime();
+  const refreshCounter = useRefreshCounter();
   const setIsLoading = useSetIsLoadingMedia();
   const refresh = useRefreshMedia();
   const guestName = useGuestName();
-  const hasHydrated = useHasHydrated();
   const previousGuestName = useRef<string | null>(null);
   const mediaRef = useRef<MediaProps[]>(media);
   const { t, language } = useI18n();
@@ -118,13 +116,8 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
         setIsLoading(true);
       }
       try {
-        let url = '/api/photos';
         const guestToUse = guestOverride || guestName;
-        if (appConfig.guestIsolation && guestToUse) {
-          url += `?guest=${encodeURIComponent(guestToUse)}`;
-        }
-
-        const response = await fetch(url);
+        const response = await fetch(getPhotosApiUrl(guestToUse));
 
         if (response.ok) {
           const refreshedMedia = await response.json();
@@ -188,12 +181,13 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
     }
   }, [guestName, refetchWeddingMediaInternal]);
 
-  // Show name input when guest name hasn't been set yet
-  const shouldShowNameInput = hasHydrated && !guestName;
-
-  if (shouldShowNameInput) {
-    return <GuestNameForm />;
-  }
+  // Pre-compute optimized props for all gallery items to avoid re-calling
+  // getOptimizedMediaProps on every render cycle
+  const optimizedMediaProps = useMemo(
+    () =>
+      media.map((item, index) => getOptimizedMediaProps(item, 'gallery', { priority: index < 2 })),
+    [media]
+  );
 
   // For guest isolation mode, show loading state while fetching media
   const isFetchingMedia = appConfig.guestIsolation && guestName && media.length === 0 && isLoading;
@@ -278,7 +272,7 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
             }
           >
             <StorageAwareMedia
-              {...getOptimizedMediaProps(mediaItem, 'gallery', { priority: index < 2 })}
+              {...optimizedMediaProps[index]}
               className="overflow-hidden transform rounded-lg brightness-90 transition will-change-auto group-hover:brightness-110 group-focus:brightness-110"
               style={{ transform: 'translate3d(0, 0, 0)' }}
             />
@@ -303,8 +297,14 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
         ))}
       </div>
 
-      <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
-        {t('accessibility.galleryUpdated', { time: lastRefreshTime.toLocaleTimeString(language) })}
+      <div
+        className="sr-only"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        key={refreshCounter}
+      >
+        {t('accessibility.galleryUpdated', { time: new Date().toLocaleTimeString(language) })}
       </div>
 
       <MediaModal

@@ -1,6 +1,6 @@
 /**
  * Core media data structure for the wedding gallery application.
- * Represents a photo or video with metadata from the storage provider and guest information.
+ * Represents a photo or video with metadata and guest information.
  */
 export interface MediaProps {
   /** Unique identifier for the media in the gallery */

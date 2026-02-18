@@ -19,7 +19,7 @@ import {
 export const runtime = 'nodejs';
 
 /**
- * Handles media upload requests using the configured storage provider.
+ * Handles media upload requests.
  *
  * @param request - The incoming request containing file and guest name
  * @returns JSON response with upload URL or error

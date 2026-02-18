@@ -30,15 +30,12 @@ import {
 } from 'lucide-react';
 import type { MediaProps } from '../utils/types';
 import { getOptimizedMediaProps, prefetchMediaOnInteraction } from '../utils/mediaOptimization';
-import { getDownloadUrl, getExternalUrl } from '../utils/imageUrl';
+
 import { useI18n } from './I18nProvider';
 
-// Inline animation variants
+// Inline animation variants — enter/center are identical (no entrance animation),
+// only exit fades out.
 const variants = {
-  enter: {
-    x: 0,
-    opacity: 1,
-  },
   center: {
     x: 0,
     opacity: 1,
@@ -164,8 +161,6 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
   // Zoom functions
   const zoomIn = useCallback(() => setZoom((prev) => Math.min(prev * 1.5, 5)), []);
   const zoomOut = useCallback(() => setZoom((prev) => Math.max(prev / 1.5, 0.5)), []);
-  const resetZoom = useCallback(() => resetView(), [resetView]);
-
   // Calculate distance between two touch points
   const getDistance = useCallback((touches: React.TouchList) => {
     if (touches.length < 2) return 0;
@@ -276,7 +271,7 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
   useKeypress('+', () => !isVideo && zoomIn(), { disabled: !isOpen });
   useKeypress('=', () => !isVideo && zoomIn(), { disabled: !isOpen });
   useKeypress('-', () => !isVideo && zoomOut(), { disabled: !isOpen });
-  useKeypress('0', () => !isVideo && resetZoom(), { disabled: !isOpen });
+  useKeypress('0', () => !isVideo && resetView(), { disabled: !isOpen });
 
   // Touch event handlers for pinch-to-zoom
   const handleTouchStart = useCallback(
@@ -520,11 +515,7 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
                     <>
                       <div className="fixed top-2 md:top-4 left-2 md:left-5 z-20 flex items-center gap-1 rounded-full bg-black/50 backdrop-blur-lg p-1">
                         <a
-                          href={getExternalUrl(
-                            currentItem.public_id,
-                            currentItem.resource_type,
-                            currentItem.format
-                          )}
+                          href={currentItem.public_id}
                           className="rounded-full p-3 text-white/75 transition hover:bg-black/50 hover:text-white"
                           target="_blank"
                           title={t('modal.openFullsize')}
@@ -535,13 +526,8 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
                         </a>
                         <button
                           onClick={() => {
-                            const downloadUrl = getDownloadUrl(
-                              currentItem.public_id,
-                              currentItem.resource_type,
-                              currentItem.format
-                            );
                             const link = document.createElement('a');
-                            link.href = downloadUrl;
+                            link.href = currentItem.public_id;
                             link.download = `wedding-photo-${currentIndex + 1}.${currentItem.format}`;
                             document.body.appendChild(link);
                             link.click();
@@ -580,7 +566,7 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
                           </button>
                           {zoom !== 1 && (
                             <button
-                              onClick={resetZoom}
+                              onClick={resetView}
                               className="rounded-full p-3 text-white/75 transition hover:bg-black/50 hover:text-white ml-0.5"
                               title={t('modal.resetZoom')}
                               aria-label={t('modal.resetZoom')}
@@ -622,7 +608,7 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
                     <motion.div
                       key={`${currentIndex}-${currentItem.id}`}
                       variants={variants}
-                      initial="enter"
+                      initial="center"
                       animate="center"
                       exit="exit"
                       className="absolute inset-0 flex items-center justify-center"

@@ -167,8 +167,8 @@ export function getOptimizedMediaProps(
     ...(item.blurDataUrl
       ? { placeholder: 'blur' as const, blurDataURL: item.blurDataUrl }
       : { placeholder: 'empty' as const }),
-    quality: quality === 'thumb' ? 60 : quality === 'medium' ? 80 : 90,
     resource_type: 'image' as const,
     format: item.format as string,
+    context,
   };
 }

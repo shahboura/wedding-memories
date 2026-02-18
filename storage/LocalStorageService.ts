@@ -208,10 +208,9 @@ export class LocalStorageService implements StorageService {
     await this.ensureDir(this.basePath);
 
     const mediaItems: MediaProps[] = [];
-    const idCounter = 0;
 
     try {
-      await this.walkDirectory(searchDir, this.basePath, mediaItems, idCounter);
+      await this.walkDirectory(searchDir, this.basePath, mediaItems);
     } catch (error) {
       // Directory doesn't exist yet — return empty
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
@@ -241,23 +240,20 @@ export class LocalStorageService implements StorageService {
   private async walkDirectory(
     dirPath: string,
     basePath: string,
-    items: MediaProps[],
-    startId: number
-  ): Promise<number> {
-    let id = startId;
-
+    items: MediaProps[]
+  ): Promise<void> {
     let entries;
     try {
       entries = await fs.readdir(dirPath, { withFileTypes: true });
     } catch {
-      return id;
+      return;
     }
 
     for (const entry of entries) {
       const fullPath = path.join(dirPath, entry.name);
 
       if (entry.isDirectory()) {
-        id = await this.walkDirectory(fullPath, basePath, items, id);
+        await this.walkDirectory(fullPath, basePath, items);
       } else if (entry.isFile()) {
         const ext = path.extname(entry.name).slice(1).toLowerCase();
         const mediaExtensions = [
@@ -316,7 +312,7 @@ export class LocalStorageService implements StorageService {
         }
 
         items.push({
-          id: id++,
+          id: 0, // Placeholder — reassigned after sorting in list()
           height,
           width,
           public_id: this.getMediaUrl(relativePath),
@@ -328,7 +324,5 @@ export class LocalStorageService implements StorageService {
         });
       }
     }
-
-    return id;
   }
 }
