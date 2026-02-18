@@ -1,6 +1,6 @@
 # Wedding Memories Gallery
 
-A modern, accessible wedding memories gallery supporting **both photos and videos** with multi-storage backend support. Built with Next.js, supports Cloudinary and S3/Wasabi storage providers, and features full keyboard navigation and exceptional accessibility.
+A modern, accessible wedding memories gallery supporting **both photos and videos** with local-only storage. Built with Next.js and optimized for self-hosted Docker deployments with full keyboard navigation and accessibility.
 
 🌐 **[Live Demo](https://wedding.onurgumus.com)** | 📋 **[Changelog](CHANGELOG.md)** | 🚀 **v0.1.0-beta.1**
 
@@ -15,10 +15,9 @@ A modern, accessible wedding memories gallery supporting **both photos and video
 - **Multiple file upload** with drag & drop, batch selection, and progress tracking
 - **Real-time gallery updates** automatically refresh after uploads
 - **Guest welcome system** with name collection and persistent storage
-- **Multi-storage backend** - Cloudinary, S3/Wasabi, and Local filesystem with seamless switching
-- **S3 Presigned URLs** - secure private bucket support with direct browser uploads
+- **Local storage backend** - filesystem storage optimized for self-hosted deployments
 - **Docker support** - production and dev Docker Compose with zero-config local storage
-- **Multi-language support** - English, Turkish, and Malay with runtime switching
+- **Multi-language support** - English and Malay with runtime switching
 - **Guest isolation mode** - filter media by guest when enabled in config
 - **Advanced validation** with real-time feedback and security-focused rules
 - **Mobile-optimized UX** with touch gestures and responsive design
@@ -31,8 +30,8 @@ A modern, accessible wedding memories gallery supporting **both photos and video
 
 - **Framework**: Next.js (latest) with App Router & TypeScript
 - **Styling**: Tailwind CSS v4 + shadcn/ui components
-- **Media Storage**: Multi-provider (Cloudinary, S3/Wasabi)
-- **Video Handling**: Direct HTML5 playback with presigned URL uploads
+- **Media Storage**: Local filesystem (self-hosted)
+- **Video Handling**: Direct HTML5 playback
 - **State Management**: Zustand with localStorage persistence
 - **UI Components**: Vaul drawers, Framer Motion animations
 - **Icons**: Lucide React icon library
@@ -54,7 +53,7 @@ A modern, accessible wedding memories gallery supporting **both photos and video
 
    ```bash
    cp .env.example .env
-   # Edit .env — set couple names, storage provider, and credentials
+    # Edit .env — set couple names and preferences
    ```
 
 3. **Start development**
@@ -68,63 +67,21 @@ A modern, accessible wedding memories gallery supporting **both photos and video
 
 **Environment Variables (.env)**
 
-_For Cloudinary Storage:_
-
-```bash
-# Cloudinary Configuration
-NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=your_cloud_name_here
-CLOUDINARY_API_KEY=your_api_key_here
-CLOUDINARY_API_SECRET=your_api_secret_here
-CLOUDINARY_FOLDER=wedding
-```
-
-_For S3/Wasabi Storage:_
-
-```bash
-# AWS S3 / Wasabi Configuration
-AWS_REGION=us-east-1
-AWS_ACCESS_KEY_ID=your_access_key_here
-AWS_SECRET_ACCESS_KEY=your_secret_key_here
-NEXT_PUBLIC_S3_BUCKET=your_bucket_name
-NEXT_PUBLIC_S3_ENDPOINT=https://s3.wasabisys.com  # Optional: for Wasabi or other S3-compatible services
-```
-
 **App Configuration (config.ts)**
 
 ```typescript
-export enum StorageProvider {
-  Cloudinary = 'cloudinary',
-  S3 = 's3',
-  Local = 'local',
-}
-
 export const appConfig = {
   brideName: 'YourBrideName', // or set NEXT_PUBLIC_BRIDE_NAME env var
   groomName: 'YourGroomName', // or set NEXT_PUBLIC_GROOM_NAME env var
   guestIsolation: false, // or set NEXT_PUBLIC_GUEST_ISOLATION env var
-  storage: StorageProvider.Cloudinary, // or set NEXT_PUBLIC_STORAGE_PROVIDER env var
+  storage: StorageProvider.Local,
 };
 ```
 
-**Storage Providers**
+**Storage**
 
-- **Local**: Filesystem storage with no cloud dependencies — ideal for Docker / self-hosted deployments
-- **Cloudinary**: Cloud-based media storage with automatic optimization, transformations, and blur placeholders for images/videos
-- **S3/Wasabi**: Object storage compatible with AWS S3 API via secure proxy with request deduplication and stream handling
-- **Seamless Switching**: Change providers via `NEXT_PUBLIC_STORAGE_PROVIDER` env var or `config.ts` — no code changes required
-- **Smart Media Handling**: Automatic optimization for Cloudinary, proxy-based serving for S3/Wasabi with progressive video loading
-- **Feature Parity**: Download, external links, and all functionality work identically across providers
-
-**S3/Wasabi Presigned URL Architecture**
-
-- **Unified Upload Endpoint**: `/api/upload` handles all media with smart routing based on storage provider
-- **Direct Browser Uploads**: Large files upload directly to S3, bypassing Vercel's 10MB limit
-- **Private Bucket Support**: Full support for private S3 buckets via presigned URLs
-- **Secure Access**: Presigned read URLs (24h expiry) and write URLs (1h expiry)
-- **Request Type Detection**: JSON metadata vs FormData automatically detected
-- **Storage Agnostic**: Frontend code adapts automatically to configured storage provider
-- **No 413 Errors**: Video files >10MB bypass server entirely for S3 uploads
-- **Maintains Features**: All Cloudinary optimizations and S3 uploads work seamlessly
+- **Local filesystem**: Filesystem storage with no cloud dependencies — ideal for Docker / self-hosted deployments
+- **Media variants**: Server generates thumbnail and medium WebP variants for images
 
 **Guest Isolation Mode**
 
@@ -146,30 +103,25 @@ export const appConfig = {
 ├── components/            # React components
 │   ├── ui/               # shadcn/ui components (Button, Drawer, etc.)
 │   ├── MediaGallery.tsx  # Masonry grid with modal integration for photos/videos
-│   ├── StorageAwareMedia.tsx # Storage-agnostic media rendering with HTML5 video
+│   ├── StorageAwareMedia.tsx # Local media rendering with HTML5 video
 │   ├── MediaModal.tsx    # Modal with pinch-to-zoom and gesture support
-│   ├── Upload.tsx        # Unified media upload with presigned URL support
+│   ├── Upload.tsx        # Unified media upload
 │   ├── AppLoader.tsx     # Startup loader with couple names
 │   └── WelcomeDialog.tsx # Guest name collection
 ├── store/                # Zustand state management
 │   └── useAppStore.ts    # Global state store
 ├── storage/              # Storage abstraction layer
 │   ├── StorageService.ts # Storage interface definition
-│   ├── CloudinaryService.ts # Cloudinary implementation with blur placeholders
-│   ├── S3Service.ts      # S3/Wasabi implementation with presigned URLs
 │   ├── LocalStorageService.ts # Local filesystem implementation
-│   └── index.ts          # Provider selection and export
+│   └── index.ts          # Storage export
 ├── locales/              # i18n translation files
 │   ├── en/               # English
-│   ├── tr/               # Turkish
 │   └── ms/               # Malay (Melayu)
 ├── utils/                # Utilities and helpers
 │   ├── types.ts          # TypeScript interfaces for media data
 │   ├── validation.ts     # Input validation utilities with security focus
-│   ├── imageUrl.ts       # Storage-agnostic URL generation (MediaUrlService)
-│   ├── mediaOptimization.ts  # Storage-aware optimization for images and videos
-│   ├── generateBlurPlaceholder.ts # Blur placeholder generation for smooth loading
-│   ├── cloudinary.ts     # Cloudinary API integration
+│   ├── imageUrl.ts       # Media URL passthrough
+│   ├── mediaOptimization.ts  # Local image variant URLs
 │   └── testing.ts        # Test utilities and mocks
 ├── Dockerfile            # Multi-stage Docker build (deps → build → runner)
 ├── docker-compose.yml    # Production Docker Compose
@@ -211,7 +163,7 @@ Deploy to [Vercel](https://vercel.com/new/clone) (recommended), Docker, or any p
    docker compose -f docker-compose.yml -f docker-compose.dev.yml up
    ```
 
-   - Uses `NEXT_PUBLIC_STORAGE_PROVIDER=local` by default — no cloud credentials needed
+   - Uses local filesystem storage — no cloud credentials needed
    - Uploaded media persists in a Docker named volume (`wedding-uploads`)
    - Set `NEXT_PUBLIC_BRIDE_NAME`, `NEXT_PUBLIC_GROOM_NAME`, `NEXT_PUBLIC_DEFAULT_LANGUAGE`, etc. in `.env`
    - See `.env.docker.example` for all available options
@@ -230,7 +182,7 @@ Deploy to [Vercel](https://vercel.com/new/clone) (recommended), Docker, or any p
 - **Advanced name validation** with real-time feedback, length limits, and character restrictions
 - **Guest isolation system** with server-side and client-side filtering
 - **Mobile-optimized UX** with improved touch targets and responsive dialogs
-- **Performance optimizations** with Next.js Image, Cloudinary transformations, and caching
+- **Performance optimizations** with local image variants and caching
 - **Progressive enhancement** with graceful fallbacks for all features
 - **Real-time state management** with Zustand and localStorage persistence
 - **Mobile-first responsive design** with Tailwind CSS utilities
@@ -258,4 +210,4 @@ This project was bootstrapped with the
 
 ---
 
-Built with ❤️ using [Next.js](https://nextjs.org), [Cloudinary](https://cloudinary.com), [shadcn/ui](https://ui.shadcn.com), and [Tailwind CSS](https://tailwindcss.com).
+Built with ❤️ using [Next.js](https://nextjs.org), [shadcn/ui](https://ui.shadcn.com), and [Tailwind CSS](https://tailwindcss.com).

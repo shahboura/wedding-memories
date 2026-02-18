@@ -520,6 +520,43 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
         formData.append('file', uploadFile.file);
         formData.append('guestName', guestName);
 
+        if (uploadFile.file.type.startsWith('video/')) {
+          const video = document.createElement('video');
+          const objectUrl = URL.createObjectURL(uploadFile.file);
+
+          try {
+            const metadata = await new Promise<{ width: number; height: number }>((resolve) => {
+              let settled = false;
+              const timeoutId = window.setTimeout(() => {
+                if (!settled) {
+                  settled = true;
+                  resolve({ width: 720, height: 480 });
+                }
+              }, 4000);
+
+              video.preload = 'metadata';
+              video.onloadedmetadata = () => {
+                if (settled) return;
+                settled = true;
+                window.clearTimeout(timeoutId);
+                resolve({ width: video.videoWidth || 720, height: video.videoHeight || 480 });
+              };
+              video.onerror = () => {
+                if (settled) return;
+                settled = true;
+                window.clearTimeout(timeoutId);
+                resolve({ width: 720, height: 480 });
+              };
+              video.src = objectUrl;
+            });
+
+            formData.append('width', String(metadata.width));
+            formData.append('height', String(metadata.height));
+          } finally {
+            URL.revokeObjectURL(objectUrl);
+          }
+        }
+
         // No real progress events from fetch(); show 50% to indicate upload started
         setFiles((prev) => prev.map((f) => (f.id === uploadFile.id ? { ...f, progress: 50 } : f)));
 

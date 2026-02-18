@@ -13,24 +13,27 @@ Thank you for your interest in contributing to the Wedding Memories Gallery! Thi
 
 ### Prerequisites
 
-- Node.js 18+ 
+- Node.js 18+
 - pnpm package manager
 - Storage account for testing (Cloudinary or S3/Wasabi)
 
 ### Development Setup
 
 1. **Fork and Clone**
+
    ```bash
    git clone https://github.com/YOUR_USERNAME/wedding-memories.git
    cd wedding-memories
    ```
 
 2. **Install Dependencies**
+
    ```bash
    pnpm install
    ```
 
 3. **Environment Setup**
+
    ```bash
    cp .env.example .env
    # Edit .env with your storage provider credentials (Cloudinary or S3/Wasabi)
@@ -55,7 +58,7 @@ Thank you for your interest in contributing to the Wedding Memories Gallery! Thi
 
 ### Naming Conventions
 
-- **Functions**: `uploadPhotos()`, `generateBlurPlaceholder()`, `validateImageFile()`
+- **Functions**: `uploadPhotos()`, `validateImageFile()`
 - **Variables**: `photoMetadata`, `isUploadComplete`, `galleryState`
 - **Constants**: `MAX_FILE_SIZE`, `CLOUDINARY_FOLDER`, `IMAGE_QUALITY`
 - **Components**: `PhotoGallery`, `CachedModal`, `WelcomeDialog`
@@ -94,9 +97,9 @@ Thank you for your interest in contributing to the Wedding Memories Gallery! Thi
 ### Test Structure
 
 ```typescript
-describe("ImageValidator", () => {
-  describe("validateImageFile", () => {
-    it("should accept valid image files", async () => {
+describe('ImageValidator', () => {
+  describe('validateImageFile', () => {
+    it('should accept valid image files', async () => {
       const validFiles = [
         createMockFile('photo.jpg', 'image/jpeg', 2 * 1024 * 1024),
         createMockFile('wedding.png', 'image/png', 5 * 1024 * 1024),
@@ -107,7 +110,7 @@ describe("ImageValidator", () => {
       }
     });
 
-    it("should reject oversized files", async () => {
+    it('should reject oversized files', async () => {
       const oversizedFile = createMockFile('huge.jpg', 'image/jpeg', 20 * 1024 * 1024);
       await expect(validateImageFile(oversizedFile)).rejects.toThrow('File too large');
     });
@@ -127,6 +130,7 @@ describe("ImageValidator", () => {
 ### Before Submitting
 
 1. **Quality Checks**
+
    ```bash
    pnpm lint        # Run ESLint
    pnpm type-check  # TypeScript validation
@@ -157,24 +161,29 @@ describe("ImageValidator", () => {
 
 ```markdown
 ## Description
+
 Brief description of changes made.
 
 ## Type of Change
+
 - [ ] Bug fix
 - [ ] New feature
 - [ ] Breaking change
 - [ ] Documentation update
 
 ## Testing
+
 - [ ] Upload functionality tested
 - [ ] Modal navigation verified
 - [ ] Mobile responsiveness checked
 - [ ] Accessibility validated
 
 ## Screenshots
+
 <!-- Include screenshots for UI changes -->
 
 ## Checklist
+
 - [ ] Code follows project style guidelines
 - [ ] Self-review completed
 - [ ] No console errors or warnings
@@ -187,19 +196,23 @@ Brief description of changes made.
 
 ```markdown
 ## Bug Description
+
 Clear description of the issue.
 
 ## Steps to Reproduce
+
 1. Step one
 2. Step two
 3. Expected vs actual behavior
 
 ## Environment
+
 - Browser: [e.g., Chrome 120, Safari 17, Firefox 121]
 - Device: [e.g., iPhone 13, Samsung Galaxy S23, MacBook Pro M2]
 - OS: [e.g., iOS 17, Android 14, macOS 14, Windows 11]
 
 ## Screenshots
+
 <!-- Include screenshots if applicable -->
 ```
 
@@ -207,15 +220,19 @@ Clear description of the issue.
 
 ```markdown
 ## Feature Description
+
 Clear description of the requested feature.
 
 ## Use Case
+
 Why would this feature be useful?
 
 ## Proposed Solution
+
 How do you envision this working?
 
 ## Additional Context
+
 Any other context or screenshots about the feature request.
 ```
 
@@ -301,6 +318,7 @@ Any other context or screenshots about the feature request.
 ## Recognition
 
 Contributors will be recognized in:
+
 - GitHub contributor list
 - Release notes for significant contributions
 - Project documentation when appropriate

@@ -149,11 +149,7 @@ export async function POST(request: NextRequest): Promise<
   NextResponse<
     | {
         url: string;
-        uploadMethod?: string;
-        presignedUrl?: string;
-        publicUrl?: string;
         guestName?: string;
-        fileName?: string;
       }
     | ApiErrorResponse
   >
@@ -179,6 +175,14 @@ export async function POST(request: NextRequest): Promise<
     });
 
     const { file, guestName } = validateUploadRequest(formData);
+    const widthValue = formData.get('width');
+    const heightValue = formData.get('height');
+    const width = typeof widthValue === 'string' ? Number(widthValue) : undefined;
+    const height = typeof heightValue === 'string' ? Number(heightValue) : undefined;
+    const metadata =
+      Number.isFinite(width) && Number.isFinite(height)
+        ? { width: width as number, height: height as number }
+        : undefined;
 
     // Validate magic bytes — quarantine files whose actual content doesn't match
     // a known image/video signature (prevents spoofed MIME types)
@@ -199,7 +203,7 @@ export async function POST(request: NextRequest): Promise<
       );
     }
 
-    const uploadResult = await storage.upload(file, guestName);
+    const uploadResult = await storage.upload(file, guestName, metadata);
 
     const mediaData = {
       ...uploadResult,

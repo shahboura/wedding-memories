@@ -14,6 +14,11 @@ export interface UploadResult {
   duration?: number;
 }
 
+export interface UploadMetadata {
+  width?: number;
+  height?: number;
+}
+
 export interface VideoUploadData {
   fileName: string;
   guestName: string;
@@ -36,7 +41,7 @@ export interface StorageService {
    * @param guestName - Optional guest name for file organization
    * @returns Promise that resolves to upload result with metadata
    */
-  upload(file: File, guestName?: string): Promise<UploadResult>;
+  upload(file: File, guestName?: string, metadata?: UploadMetadata): Promise<UploadResult>;
 
   /**
    * Lists all photos from the storage provider with metadata.

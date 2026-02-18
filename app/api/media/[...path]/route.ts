@@ -50,7 +50,6 @@ function nodeStreamToWebStream(nodeStream: Readable): ReadableStream<Uint8Array>
 
 /**
  * Serves media files from the local storage directory.
- * Only active when NEXT_PUBLIC_STORAGE_PROVIDER=local.
  *
  * Security:
  * - Path traversal prevention (rejects ../ sequences)

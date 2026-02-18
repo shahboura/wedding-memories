@@ -1,7 +1,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import sharp from 'sharp';
-import { StorageService, UploadResult, VideoUploadData } from './StorageService';
+import { StorageService, UploadMetadata, UploadResult, VideoUploadData } from './StorageService';
 import type { MediaProps } from '../utils/types';
 
 /**
@@ -96,7 +96,7 @@ export class LocalStorageService implements StorageService {
     return videoFormats.includes(format.toLowerCase()) ? 'video' : 'image';
   }
 
-  async upload(file: File, guestName?: string): Promise<UploadResult> {
+  async upload(file: File, guestName?: string, metadata?: UploadMetadata): Promise<UploadResult> {
     const timestamp = Date.now();
     const randomSuffix = Math.random().toString(36).substring(7);
     const fileExtension = path.extname(file.name).slice(1).toLowerCase() || 'jpg';
@@ -115,8 +115,8 @@ export class LocalStorageService implements StorageService {
     const buffer = Buffer.from(arrayBuffer);
     await fs.writeFile(absolutePath, buffer);
 
-    let width = 720;
-    let height = 480;
+    let width = metadata?.width ?? 720;
+    let height = metadata?.height ?? 480;
     let blurDataUrl = '';
     if (file.type.startsWith('image/')) {
       const result = await this.generateImageAssets(buffer, absoluteDir, baseName);

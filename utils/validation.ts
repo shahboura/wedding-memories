@@ -20,7 +20,7 @@ const SUPPORTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/we
 const SUPPORTED_IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp'] as const;
 
 /**
- * Supported video MIME types for file validation (S3/Wasabi only).
+ * Supported video MIME types for file validation.
  */
 const SUPPORTED_VIDEO_TYPES = [
   'video/mp4',
@@ -31,7 +31,7 @@ const SUPPORTED_VIDEO_TYPES = [
 ] as const;
 
 /**
- * Supported video file extensions (S3/Wasabi only).
+ * Supported video file extensions.
  */
 const SUPPORTED_VIDEO_EXTENSIONS = ['.mp4', '.mov', '.avi', '.webm'] as const;
 
@@ -52,11 +52,11 @@ const MAX_GUEST_NAME_LENGTH = 50;
 const MIN_GUEST_NAME_LENGTH = 2;
 
 /**
- * Validates if a file is a supported media format (image or video for S3).
+ * Validates if a file is a supported media format (image or video).
  *
  * @param file - File to validate
- * @param allowVideos - Whether to allow video files (true for S3/Wasabi)
- * @param enforceFileSize - Whether to enforce file size limits (false for S3/Wasabi)
+ * @param allowVideos - Whether to allow video files
+ * @param enforceFileSize - Whether to enforce file size limits
  * @returns True if file is valid
  * @throws {ValidationError} If file is not valid
  */
@@ -69,7 +69,7 @@ export function validateMediaFile(
     throw new ValidationError('File is required', 'file');
   }
 
-  // Check file size only if enforced (Cloudinary has limits, S3/Wasabi doesn't)
+  // Check file size only if enforced
   if (enforceFileSize) {
     const isVideo = file.type.startsWith('video/');
     const maxSize = isVideo ? MAX_VIDEO_SIZE : MAX_FILE_SIZE;

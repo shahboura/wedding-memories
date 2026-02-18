@@ -1,8 +1,7 @@
 /**
- * Storage-aware media component that handles Cloudinary, S3/Wasabi, and Local storage.
+ * Storage-aware media component for local storage.
  *
- * - For Cloudinary: Uses Next.js Image for optimization or a video tag.
- * - For S3/Wasabi/Local: Uses direct img/video tags to avoid optimization issues.
+ * Uses direct img/video tags to avoid Next.js image optimization.
  */
 
 import { useState, useRef, useEffect } from 'react';

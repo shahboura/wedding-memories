@@ -103,6 +103,16 @@ Summaries should be added to this AGENTS.md file under a "Session Summaries" sec
 
 ## Session Summaries
 
+### 2026-02-18 14:30 - Review Task 1/2 gaps
+
+**Agent:** review  
+**Summary:** Reviewed recent changes against Migration-Plan.md focusing on Task 1 (local-only removal) and Task 2 (sharp pipeline).
+
+- Noted remaining cloud/provider references and outdated docs/comments (README, validation.ts, app/page.tsx, mediaOptimization.ts, StorageAwareMedia.tsx, api/media route comment, AGENTS.md) that contradict local-only goal
+- Found Task 2 partially implemented: LocalStorageService now uses sharp for image variants + blur, but video metadata/variants still hardcoded and uploadVideo unused
+- Identified risks: video dimensions remain 720x480 placeholders; upload API never uses uploadVideo; doc mismatches could mislead deployment
+- Recommended cleanup of dead/legacy interfaces (VideoUploadData) and presigned upload response types in api/upload response shape
+
 ### 2026-02-18 — Bug Fixes (Wrong Modal Item, Upload Placeholders, Video Thumbnails) & View Switcher Evaluation
 
 **Agent:** orchestrator
@@ -147,7 +157,7 @@ Summaries should be added to this AGENTS.md file under a "Session Summaries" sec
 **Architecture notes:**
 
 - Next.js 16, React 19, Tailwind CSS v4, Zustand, Framer Motion, Radix UI
-- Storage abstracted via `StorageService` interface — Cloudinary, S3/Wasabi, Local
+- Storage abstracted via `StorageService` interface — Local-only
 - i18n via i18next + react-i18next (English, Malay)
 - Docker multi-stage build, standalone output
 - Guest name stored in `localStorage` via Zustand persist — zero cookies, zero server sessions
@@ -156,12 +166,12 @@ Summaries should be added to this AGENTS.md file under a "Session Summaries" sec
 **Open items (not urgent):**
 
 - I2: Change `selectedMediaId: number | string | null` → `number | null` (dead `string` branch since `addMedia` removed)
-- P6: S3/Local images served at full resolution (needs sharp pipeline)
+- P6: Local images served at full resolution (needs sharp pipeline)
 - P8: No pagination on media list API
 - H2: Download URL not validated against `javascript:` scheme in MediaModal
 - O3: Duplicate `/api/photos` URL construction in Upload.tsx and MediaGallery.tsx
 - O5: No AbortController on gallery refetch in handleUploadAll
-- `LocalStorageService` hardcodes dimensions — no actual video/image probing
+- `LocalStorageService` hardcodes video dimensions — no actual video probing
 
 **Verification:** `pnpm type-check` and `pnpm lint` both pass with zero errors/warnings.
 
@@ -175,7 +185,7 @@ Summaries should be added to this AGENTS.md file under a "Session Summaries" sec
 **What was done:**
 
 - **Docker runtime fix** — Root cause: `STORAGE_PROVIDER` env var lacked `NEXT_PUBLIC_` prefix, so client-side code defaulted to Cloudinary, causing "cloud name not configured" warnings and 14+ `<link rel="preload">` spam. Renamed to `NEXT_PUBLIC_STORAGE_PROVIDER` across `config.ts`, `docker-compose.yml`, `.env.docker.example`, `Dockerfile`, `validate-env.cjs`, `route.ts`, and `README.md`
-- **Local storage client support** — Added `StorageProvider.Local` branches in `imageUrl.ts` (all 5 public methods + new `getLocalUrl` private method), `mediaOptimization.ts` (treats Local same as S3), `generateBlurPlaceholder.ts` (returns grey placeholder for non-Cloudinary), and `StorageAwareMedia.tsx` (doc comment)
+- **Local storage client support** — Added `StorageProvider.Local` branches in `imageUrl.ts` (all 5 public methods + new `getLocalUrl` private method), `mediaOptimization.ts` (treats Local same as S3), and `StorageAwareMedia.tsx` (doc comment)
 - **`mediaOptimization.ts` rewrite** — Removed 3 dead exports (`shouldPrioritize`, `prefetchModalMediaNavigation`, `simpleMediaPrefetch`), removed unnecessary `export` from internal functions, removed unused `format` param, removed unreachable `default` branch, removed `videoId`/`duration`/`guestName` from video props return
 - **Dead code cleanup (6 files):**
   - `imageUrl.ts` — Removed dead `supportsOptimization()` method; collapsed identical video/image branches in `getCloudinaryUrl`

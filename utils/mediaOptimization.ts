@@ -1,9 +1,8 @@
 /**
- * Storage-agnostic media optimization utilities.
+ * Local media optimization utilities.
  *
- * This module provides utilities that work with any storage provider
- * (Cloudinary, S3/Wasabi, Local) and generate appropriate URLs for both
- * images and videos based on the configured storage provider.
+ * This module generates local image variant URLs (thumb/medium) and
+ * returns direct URLs for videos.
  */
 
 import type { MediaProps } from './types';
@@ -134,8 +133,7 @@ export function getOptimizedMediaProps(
       };
     }
 
-    // For S3/Local, use URL directly since we don't have quality transformations
-    // For Cloudinary, use optimized quality based on context
+    // Videos use direct URLs since we don't generate video variants yet
     const videoSrc = getOptimizedMediaUrl(
       item.public_id,
       item.resource_type,
