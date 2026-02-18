@@ -3,6 +3,7 @@ import * as fs from 'fs/promises';
 import { createReadStream } from 'fs';
 import * as path from 'path';
 import type { Readable } from 'stream';
+import { isEventTokenRequired, isEventTokenValid } from '../../../../utils/eventToken';
 
 export const runtime = 'nodejs';
 
@@ -62,6 +63,12 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
 ): Promise<NextResponse> {
+  if (isEventTokenRequired() && !isEventTokenValid(request)) {
+    return NextResponse.json(
+      { error: 'Unauthorized access', details: 'A valid event token is required to view media.' },
+      { status: 401 }
+    );
+  }
   const { path: pathSegments } = await params;
 
   // Reject empty paths
