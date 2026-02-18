@@ -103,6 +103,40 @@ Summaries should be added to this AGENTS.md file under a "Session Summaries" sec
 
 ## Session Summaries
 
+### 2026-02-19 19:10 - Event token QR route + streaming upload refactor
+
+**Agent:** planner  
+**Summary:** Implemented /event token QR route, streaming uploads, and refactors.
+
+- Added /event?token=... route to set HttpOnly cookie and redirect to gallery
+- Switched upload pipeline to Busboy streaming + XHR progress with server/client helpers
+- Added rate-limit configurability and event token guidance in env templates
+- Removed CHANGELOG and cleaned dead video upload types
+- Updated README for token QR link and fixed outdated component list
+- Handoff to: codebase for final testing
+
+### 2026-02-19 18:40 - Event token QR route + streaming upload refactor
+
+**Agent:** planner  
+**Summary:** Added /event token redirect flow and streamlined upload pipeline.
+
+- Implemented /event?token=... route to set HttpOnly cookie and redirect to gallery
+- Added streaming upload pipeline with Busboy + XHR progress and extracted helpers
+- Added rate-limit configurability, event token guidance, removed CHANGELOG, and cleaned dead code
+- Updated README and env templates for token usage and QR link
+- Handoff to: codebase for any further cleanup or testing
+
+### 2026-02-19 14:20 - Event token URL + streaming upload refactor
+
+**Agent:** planner  
+**Summary:** Added /event token redirect flow and refactored upload handling.
+
+- Implemented /event?token=... route to set HttpOnly cookie and redirect to gallery
+- Added streaming upload pipeline with Busboy + XHR progress and extracted helpers
+- Added rate-limit configurability, event token guidance, removed CHANGELOG, and cleaned dead code
+- Updated README and env templates for token usage and QR link
+- Handoff to: codebase for any further cleanup or testing
+
 ### 2026-02-18 16:45 - Local-only pipeline + ISR refresh
 
 **Agent:** orchestrator

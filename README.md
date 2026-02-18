@@ -2,7 +2,7 @@
 
 A modern, accessible wedding memories gallery supporting **both photos and videos** with local-only storage. Built with Next.js and optimized for self-hosted Docker deployments with full keyboard navigation and accessibility.
 
-🌐 **[Live Demo](https://wedding.onurgumus.com)** | 📋 **[Changelog](CHANGELOG.md)** | 🚀 **v0.1.0-beta.1**
+🌐 **[Live Demo](https://wedding.onurgumus.com)** | 🚀 **v0.1.0-beta.1**
 
 > 🎯 **Beta**: Enhanced video support, improved code quality, and open source preparation.
 
@@ -67,6 +67,15 @@ A modern, accessible wedding memories gallery supporting **both photos and video
 
 **Environment Variables (.env)**
 
+**Event Token (Optional)**
+
+- Set `EVENT_TOKEN` to gate access to the gallery and uploads.
+- Guests can join via QR link that sets a secure cookie and redirects to the gallery:
+
+```
+https://your-domain.com/event?token=YOUR_EVENT_TOKEN
+```
+
 **App Configuration (config.ts)**
 
 ```typescript
@@ -107,7 +116,7 @@ export const appConfig = {
 │   ├── MediaModal.tsx    # Modal with pinch-to-zoom and gesture support
 │   ├── Upload.tsx        # Unified media upload
 │   ├── AppLoader.tsx     # Startup loader with couple names
-│   └── WelcomeDialog.tsx # Guest name collection
+│   └── GuestNameForm.tsx # Guest name collection
 ├── store/                # Zustand state management
 │   └── useAppStore.ts    # Global state store
 ├── storage/              # Storage abstraction layer
