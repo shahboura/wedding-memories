@@ -103,6 +103,17 @@ Summaries should be added to this AGENTS.md file under a "Session Summaries" sec
 
 ## Session Summaries
 
+### 2026-02-20 03:00 - Fix swipe flicker and filmstrip click not navigating
+
+**Agent:** orchestrator  
+**Summary:** Eliminated main-content flicker on swipe/click and fixed filmstrip thumbnails sometimes not navigating, caused by `AnimatePresence` exit animations and curried ref-callback churn.
+
+- Removed `AnimatePresence`, `MotionConfig`, and `variants` — main content now uses a plain keyed `<div>` for instant swap (no exit-fade flicker)
+- Split curried `thumbRefCallback(index)` (which depended on `[currentIndex]` and churned all refs every navigation) into stable `setThumbRef(index)` (`[]` deps, stores in Map) + separate `useEffect([currentIndex])` for `scrollIntoView`
+- Added `currentIndexRef` and `changeMediaIndexRef` synced via `useEffect` so the scroll listener uses refs instead of stale closure values — listener now registers once with `[]` deps, no teardown/re-register on navigation
+- Root causes: (1) `AnimatePresence mode="wait"` faded out old item before showing new one with no meaningful entrance animation; (2) curried ref callback with `[currentIndex]` dep caused React to call `ref(null)` then `ref(node)` for ALL buttons on every index change, triggering `scrollIntoView` which fired the scroll listener with a stale `currentIndex` closure
+- Verified: `pnpm type-check` and `pnpm lint` both pass with zero errors/warnings
+
 ### 2026-02-20 02:30 - Sync filmstrip scroll position with currentIndex
 
 **Agent:** orchestrator  
