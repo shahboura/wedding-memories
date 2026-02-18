@@ -21,10 +21,6 @@ export interface MediaProps {
   guestName?: string;
   /** ISO date string when the media was uploaded */
   uploadDate?: string;
-  /** Unique video ID (videos only) */
-  videoId?: string;
-  /** Video duration in seconds (videos only) */
-  duration?: number;
 }
 
 /**

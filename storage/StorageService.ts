@@ -11,20 +11,11 @@ export interface UploadResult {
   format: string;
   resource_type: 'image' | 'video';
   created_at: string;
-  duration?: number;
 }
 
 export interface UploadMetadata {
   width?: number;
   height?: number;
-}
-
-export interface VideoUploadData {
-  fileName: string;
-  guestName: string;
-  videoId: string;
-  fileType: string;
-  fileSize: number;
 }
 
 /**
@@ -50,13 +41,4 @@ export interface StorageService {
    * @returns Promise that resolves to an array of photo data with metadata
    */
   list(guestName?: string): Promise<MediaProps[]>;
-
-  /**
-   * Uploads a video file to the storage provider.
-   *
-   * @param buffer - Video file buffer
-   * @param options - Video upload options
-   * @returns Promise that resolves to upload result with metadata
-   */
-  uploadVideo(buffer: Buffer, options: VideoUploadData): Promise<UploadResult>;
 }

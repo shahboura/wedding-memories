@@ -1,7 +1,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import sharp from 'sharp';
-import { StorageService, UploadMetadata, UploadResult, VideoUploadData } from './StorageService';
+import { StorageService, UploadMetadata, UploadResult } from './StorageService';
 import type { MediaProps } from '../utils/types';
 
 /**
@@ -15,8 +15,6 @@ import type { MediaProps } from '../utils/types';
  *   {basePath}/
  *     {guestName}/
  *       {timestamp}-{random}.{ext}
- *       videos/
- *         {videoId}.{ext}
  */
 export class LocalStorageService implements StorageService {
   private readonly basePath: string;
@@ -277,37 +275,5 @@ export class LocalStorageService implements StorageService {
     }
 
     return id;
-  }
-
-  async uploadVideo(buffer: Buffer, options: VideoUploadData): Promise<UploadResult> {
-    const sanitizedGuestName = this.sanitizeGuestName(options.guestName);
-    const fileExtension = path.extname(options.fileName).slice(1).toLowerCase() || 'mp4';
-    const relativeDir = `${sanitizedGuestName}/videos`;
-    const baseName = options.videoId;
-    const relativePath = `${relativeDir}/${baseName}.${fileExtension}`;
-    const absoluteDir = path.join(this.basePath, relativeDir);
-    const absolutePath = path.join(this.basePath, relativePath);
-
-    await this.ensureDir(absoluteDir);
-    await fs.writeFile(absolutePath, buffer);
-
-    const metaPath = this.getMetaPath(absoluteDir, baseName);
-    await this.ensureDir(path.dirname(metaPath));
-    await fs.writeFile(
-      metaPath,
-      JSON.stringify({ width: 720, height: 480, blurDataUrl: '', format: fileExtension }, null, 2)
-    );
-
-    const mediaUrl = this.getMediaUrl(relativePath);
-
-    return {
-      url: mediaUrl,
-      public_id: mediaUrl,
-      width: 720,
-      height: 480,
-      format: fileExtension,
-      resource_type: 'video',
-      created_at: new Date().toISOString(),
-    };
   }
 }
