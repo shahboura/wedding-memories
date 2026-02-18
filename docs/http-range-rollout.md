@@ -10,6 +10,11 @@ Enable safe, low-risk rollout of HTTP Range support for local media streaming an
 - Enables faster thumbnails and partial fetches
 - Improves perceived performance for large videos
 
+## Related Config
+
+- Upload rate limits are configurable via env vars.
+- Limits are applied per guest when `EVENT_TOKEN` is set.
+
 ## Rollout Phases
 
 ### Phase 0 — Baseline (Before)

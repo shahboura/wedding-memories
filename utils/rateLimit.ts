@@ -163,15 +163,30 @@ class SlidingWindowRateLimit {
  * naturally upload in bursts (selecting 10-15 photos at once) and a
  * per-minute burst cap would only frustrate legitimate users.
  */
+function resolveRateLimitValue(value: string | undefined, fallback: number): number {
+  if (!value) return fallback;
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return parsed;
+}
+
+const uploadWindowMs = resolveRateLimitValue(
+  process.env.RATE_LIMIT_UPLOAD_WINDOW_MS,
+  5 * 60 * 1000
+);
+const uploadMax = resolveRateLimitValue(process.env.RATE_LIMIT_UPLOAD_MAX, 60);
+const photosWindowMs = resolveRateLimitValue(process.env.RATE_LIMIT_PHOTOS_WINDOW_MS, 60 * 1000);
+const photosMax = resolveRateLimitValue(process.env.RATE_LIMIT_PHOTOS_MAX, 60);
+
 const uploadRateLimit = new SlidingWindowRateLimit({
-  windowMs: 5 * 60 * 1000, // 5 minutes
-  maxRequests: 60, // 60 uploads per 5 minutes
+  windowMs: uploadWindowMs,
+  maxRequests: uploadMax,
   identifier: 'upload',
 });
 
 const photosRateLimit = new SlidingWindowRateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  maxRequests: 60, // 60 requests per minute per client
+  windowMs: photosWindowMs,
+  maxRequests: photosMax,
   identifier: 'photos',
 });
 
@@ -222,9 +237,12 @@ function normalizeGuestName(guestName: string): string {
 }
 
 function getUploadRateLimitIdentifier(request: Request, guestName: string): string {
-  const baseIdentifier = getRateLimitIdentifier(request);
+  const eventToken = getEventTokenForRateLimit(request);
   const normalizedGuest = normalizeGuestName(guestName);
-  return `${baseIdentifier}:guest=${normalizedGuest}`;
+  if (eventToken) {
+    return `${eventToken}:guest=${normalizedGuest}`;
+  }
+  return `guest=${normalizedGuest}`;
 }
 
 /**
@@ -253,7 +271,8 @@ export function checkUploadRateLimit(
     return {
       ...result,
       message:
-        "You've shared many beautiful photos! Please wait a few minutes before uploading more.",
+        `You've shared many beautiful photos! Please wait a few minutes before uploading more. ` +
+        `Limit: ${uploadMax} uploads per ${Math.round(uploadWindowMs / 60000)} minutes.`,
     };
   }
 
