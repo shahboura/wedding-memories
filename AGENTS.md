@@ -103,6 +103,15 @@ Summaries should be added to this AGENTS.md file under a "Session Summaries" sec
 
 ## Session Summaries
 
+### 2026-02-18 16:45 - Local-only pipeline + ISR refresh
+
+**Agent:** orchestrator
+
+- **Context**: Completed local-only refactor follow-ups, sharp image variants + metadata, ISR refresh fix, and docs/comment cleanup.
+- **Key Decisions**: Store image metadata in per-guest `/meta/` folders; use client-side video metadata (width/height) to avoid ffmpeg; background refresh only replaces gallery when server data is newer.
+- **Open Items**: Task 4 Android video preload, Task 5 swipe sensitivity, Task 6 MediaModal evaluation doc, Task 7 final AGENTS.md summary; Migration-Plan.md still untracked.
+- **Lessons Learned**: Background revalidate avoids ISR staleness without flicker; client video metadata is a safe stopgap for layout until server-side probing is added.
+
 ### 2026-02-18 14:30 - Review Task 1/2 gaps
 
 **Agent:** review  
