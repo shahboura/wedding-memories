@@ -115,23 +115,9 @@ export function getOptimizedMediaProps(
   const { priority = false, quality = 'medium' } = options;
 
   if (item.resource_type === 'video') {
-    // For thumbnail context, generate a static image thumbnail instead of video
-    if (context === 'thumb') {
-      return {
-        src: item.public_id,
-        alt: `Wedding video thumbnail${item.guestName && item.guestName !== 'Unknown Guest' ? ` shared by ${item.guestName}` : ''}`,
-        width: 180,
-        height: 120,
-        sizes: getResponsiveMediaSizes(context),
-        priority: false,
-        loading: 'lazy' as const,
-        resource_type: 'video' as const,
-        format: item.format as string,
-        context,
-      };
-    }
-
-    // Videos use direct URLs since we don't generate video variants yet
+    // Videos use direct URLs since we don't generate video variants yet.
+    // Video thumbnails in the modal filmstrip are rendered as static
+    // placeholders (gradient + play icon) — they never reach this function.
     const videoSrc = getOptimizedMediaUrl(
       item.public_id,
       item.resource_type,

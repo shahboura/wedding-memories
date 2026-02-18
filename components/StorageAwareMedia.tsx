@@ -86,7 +86,6 @@ export function StorageAwareMedia({
   const [hasFrame, setHasFrame] = useState(false);
   const srcRef = useRef(src);
   const isGalleryView = context === 'gallery' ? !controls : false;
-  const isThumb = context === 'thumb';
 
   // Keep srcRef in sync with current src (must be in effect, not render)
   useEffect(() => {
@@ -122,14 +121,11 @@ export function StorageAwareMedia({
 
   // Intersection Observer: lazily upgrade preload when video scrolls into view.
   // This avoids downloading metadata for off-screen videos on mobile data.
+  // Intersection Observer: lazily upgrade preload when video scrolls into view.
+  // Videos with context="thumb" are no longer rendered through this component
+  // (the modal filmstrip uses static placeholders for videos instead).
   useEffect(() => {
     if (resource_type !== 'video' || context === 'modal') return;
-
-    if (context === 'thumb') {
-      setHasFrame(false);
-      ensureVideoReady('metadata');
-      return;
-    }
 
     // Reset frame state when src changes (e.g., gallery refetch assigns new URL)
     setHasFrame(false);
@@ -170,10 +166,7 @@ export function StorageAwareMedia({
     }
 
     const handleLoadedMetadata = () => {
-      // For thumbnails, metadata is enough
-      if (context === 'thumb') {
-        setIsLoading(false);
-      }
+      setIsLoading(false);
     };
 
     const handleCanPlay = () => {
@@ -206,14 +199,6 @@ export function StorageAwareMedia({
       setLoadError(true);
       setIsLoading(false);
     };
-
-    // Check if video is already ready
-    if (video.readyState >= HTMLMediaElement.HAVE_METADATA) {
-      if (context === 'thumb') {
-        setIsLoading(false);
-        return;
-      }
-    }
 
     if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
       hasEverHadDataRef.current = true;
@@ -299,20 +284,14 @@ export function StorageAwareMedia({
         {loadError && (
           <div className="absolute inset-0 bg-gray-200 dark:bg-gray-800 rounded-lg flex items-center justify-center">
             <div className="text-center text-gray-600 dark:text-gray-300">
-              {context === 'thumb' ? (
-                <div className="text-xs font-medium">{t('common.error')}</div>
-              ) : (
-                <>
-                  <div className="text-sm font-medium mb-1">{t('common.videoUnavailable')}</div>
-                  <div className="text-xs opacity-75">{t('common.failedToLoad')}</div>
-                </>
-              )}
+              <div className="text-sm font-medium mb-1">{t('common.videoUnavailable')}</div>
+              <div className="text-xs opacity-75">{t('common.failedToLoad')}</div>
             </div>
           </div>
         )}
 
         {/* Video placeholder: gradient + icon shown until first frame is extracted */}
-        {!hasFrame && !loadError && context !== 'modal' && !isThumb && (
+        {!hasFrame && !loadError && context !== 'modal' && (
           <div className="absolute inset-0 bg-gradient-to-br from-gray-700 to-gray-900 rounded-lg flex items-center justify-center">
             <div className="bg-white/10 rounded-full p-3 backdrop-blur-sm">
               <Play className="text-white/70 w-6 h-6" fill="white" fillOpacity={0.5} />
@@ -359,9 +338,7 @@ export function StorageAwareMedia({
         )}
 
         {/* Video indicator icon - always visible for videos */}
-        <Video
-          className={`absolute ${context === 'thumb' ? 'top-1 right-1 w-3 h-3' : 'top-2 right-2 w-4 h-4'} text-white drop-shadow-lg z-10`}
-        />
+        <Video className="absolute top-2 right-2 w-4 h-4 text-white drop-shadow-lg z-10" />
 
         <video
           ref={videoRef}
@@ -373,8 +350,8 @@ export function StorageAwareMedia({
           onPlay={handlePlay}
           draggable={draggable}
           playsInline
-          muted={isGalleryView || isThumb}
-          preload={context === 'modal' || isThumb ? 'metadata' : 'none'}
+          muted={isGalleryView}
+          preload={context === 'modal' ? 'metadata' : 'none'}
           disablePictureInPicture={isMobile}
           onLoadedMetadata={() => {
             // Force show first frame so the browser renders a visible poster
