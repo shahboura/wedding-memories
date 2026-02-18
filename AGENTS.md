@@ -103,6 +103,17 @@ Summaries should be added to this AGENTS.md file under a "Session Summaries" sec
 
 ## Session Summaries
 
+### 2026-02-20 02:30 - Sync filmstrip scroll position with currentIndex
+
+**Agent:** orchestrator  
+**Summary:** Fixed filmstrip user-scroll desync — manually scrolling the filmstrip now updates `currentIndex` so the main content and active thumbnail highlight stay in sync.
+
+- Added `scrollend` event listener (with debounced `scroll` fallback for browsers without `scrollend` support) that finds the nearest-centered thumbnail via `getBoundingClientRect` and calls `changeMediaIndex`
+- Merged separate `activeThumbRef` and `setThumbRef` into single `thumbRefCallback(index)` that stores every button in a `Map<number, HTMLButtonElement>` and scrolls the active one into view
+- Added `isProgrammaticScroll` ref guard with 350ms timeout to prevent feedback loops between `scrollIntoView` calls and the scroll event listener
+- Fixed ref callback timing bug: captured `isFirstScroll` before mutating `filmstripHasScrolled.current` so instant-scroll guard timeout is correctly 0ms on modal open
+- Verified: `pnpm type-check` and `pnpm lint` both pass with zero errors/warnings
+
 ### 2026-02-20 02:00 - Rewrite filmstrip to native scroll with scroll-snap
 
 **Agent:** orchestrator  
