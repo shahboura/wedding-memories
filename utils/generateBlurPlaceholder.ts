@@ -1,5 +1,4 @@
 import type { MediaProps } from './types';
-import { appConfig, StorageProvider } from '../config';
 
 const cache = new Map<string, string>();
 
@@ -9,7 +8,7 @@ const GREY_PLACEHOLDER =
 
 export default async function getBase64ImageUrl(image: MediaProps): Promise<string> {
   const cacheKey = image.public_id;
-  let url = cache.get(cacheKey);
+  const url = cache.get(cacheKey);
   if (url) {
     return url;
   }
@@ -18,26 +17,5 @@ export default async function getBase64ImageUrl(image: MediaProps): Promise<stri
     return '';
   }
 
-  // Blur placeholders via Cloudinary CDN only work for Cloudinary storage
-  if (appConfig.storage !== StorageProvider.Cloudinary) {
-    return GREY_PLACEHOLDER;
-  }
-
-  try {
-    const response = await fetch(
-      `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload/f_jpg,w_8,q_70/${image.public_id}.${image.format}`
-    );
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch image: ${response.status}`);
-    }
-
-    const buffer = await response.arrayBuffer();
-    url = `data:image/jpeg;base64,${Buffer.from(buffer).toString('base64')}`;
-    cache.set(cacheKey, url);
-    return url;
-  } catch (error) {
-    console.error('Error generating blur placeholder:', error);
-    return GREY_PLACEHOLDER;
-  }
+  return GREY_PLACEHOLDER;
 }

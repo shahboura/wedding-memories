@@ -5,9 +5,7 @@
  * - For S3/Wasabi/Local: Uses direct img/video tags to avoid optimization issues.
  */
 
-import Image from 'next/image';
 import { useState, useRef, useEffect } from 'react';
-import { appConfig, StorageProvider } from '../config';
 import { useI18n } from './I18nProvider';
 import type { MediaProps } from '../utils/types';
 import { Play, Video } from 'lucide-react';
@@ -54,9 +52,9 @@ export function StorageAwareMedia({
   height = 480,
   resource_type,
   className,
-  sizes,
+  sizes: _sizes,
   priority = false,
-  blurDataUrl,
+  blurDataUrl: _blurDataUrl,
   style,
   onClick,
   onMouseEnter,
@@ -68,7 +66,6 @@ export function StorageAwareMedia({
   controls,
   context = 'gallery',
 }: StorageAwareMediaProps) {
-  const isCloudinary = appConfig.storage === StorageProvider.Cloudinary;
   const widthNum = width;
   const heightNum = height;
   const { t } = useI18n();
@@ -338,80 +335,6 @@ export function StorageAwareMedia({
     );
   }
 
-  // For Cloudinary Images, use Next.js Image with optimization
-  if (isCloudinary) {
-    // For modal context, render image directly without wrapper
-    if (context === 'modal') {
-      return (
-        <Image
-          src={src}
-          alt={alt}
-          width={widthNum}
-          height={heightNum}
-          className={`${className} transition-opacity duration-300`}
-          sizes={sizes}
-          priority={priority}
-          loading={priority ? 'eager' : 'lazy'}
-          placeholder={blurDataUrl ? 'blur' : 'empty'}
-          blurDataURL={blurDataUrl}
-          style={style}
-          onClick={onClick}
-          onMouseEnter={onMouseEnter}
-          tabIndex={tabIndex}
-          onKeyDown={onKeyDown}
-          onLoad={() => {
-            setIsLoading(false);
-            onLoad?.();
-          }}
-          onLoadStart={() => setIsLoading(true)}
-          draggable={draggable}
-        />
-      );
-    }
-
-    // For gallery/thumb contexts, use wrapper with aspect ratio
-    return (
-      <div
-        className="relative"
-        style={
-          context === 'thumb'
-            ? { width: '80px', height: '80px' }
-            : { aspectRatio: `${widthNum}/${heightNum}` }
-        }
-      >
-        {/* Loading skeleton */}
-        {isLoading && (
-          <div className="absolute inset-0 bg-gray-200 dark:bg-gray-800 animate-pulse rounded-lg" />
-        )}
-
-        <Image
-          src={src}
-          alt={alt}
-          width={widthNum}
-          height={heightNum}
-          className={`${className} ${isLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
-          sizes={sizes}
-          priority={priority}
-          loading={priority ? 'eager' : 'lazy'}
-          placeholder={blurDataUrl ? 'blur' : 'empty'}
-          blurDataURL={blurDataUrl}
-          style={style}
-          onClick={onClick}
-          onMouseEnter={onMouseEnter}
-          tabIndex={tabIndex}
-          onKeyDown={onKeyDown}
-          onLoad={() => {
-            setIsLoading(false);
-            onLoad?.();
-          }}
-          onLoadStart={() => setIsLoading(true)}
-          draggable={draggable}
-        />
-      </div>
-    );
-  }
-
-  // For S3/Wasabi Images, use direct img tag
   // For modal context, render image directly without wrapper
   if (context === 'modal') {
     return (
@@ -438,7 +361,6 @@ export function StorageAwareMedia({
         }}
         onLoadStart={() => setIsLoading(true)}
         draggable={draggable}
-        crossOrigin="anonymous"
       />
     );
   }
@@ -481,7 +403,6 @@ export function StorageAwareMedia({
         }}
         onLoadStart={() => setIsLoading(true)}
         draggable={draggable}
-        crossOrigin="anonymous"
       />
     </div>
   );

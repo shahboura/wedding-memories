@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
-import { appConfig, StorageProvider } from '../config';
+import { appConfig } from '../config';
 
 import { Button } from './ui/button';
 import {
@@ -191,11 +191,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
 
   const isValidMediaFile = (file: File): boolean => {
     try {
-      const isS3Storage = appConfig.storage === StorageProvider.S3;
-
-      // Cloudinary: allowVideos=true, enforceFileSize=true
-      // S3: allowVideos=true, enforceFileSize=false
-      return validateMediaFile(file, true, !isS3Storage);
+      return validateMediaFile(file, true, true);
     } catch {
       return false;
     }
@@ -519,59 +515,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
     );
 
     try {
-      const isVideo = uploadFile.file.type.startsWith('video/');
-      let data;
-
-      if (appConfig.storage === StorageProvider.S3 && isVideo) {
-        // For S3 videos, first get a presigned URL by sending only metadata
-        const presignedRes = await fetch('/api/upload', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            fileName: uploadFile.file.name,
-            fileSize: uploadFile.file.size,
-            fileType: uploadFile.file.type,
-            guestName,
-            isVideo: true,
-          }),
-        });
-
-        const presignedData = await presignedRes.json();
-
-        if (!presignedRes.ok) {
-          throw new Error(presignedData.error || 'Failed to get upload URL');
-        }
-
-        // Upload directly to S3 using the presigned URL
-        setFiles((prev) => prev.map((f) => (f.id === uploadFile.id ? { ...f, progress: 20 } : f)));
-
-        const uploadRes = await fetch(presignedData.presignedUrl, {
-          method: 'PUT',
-          body: uploadFile.file,
-          headers: {
-            'Content-Type': uploadFile.file.type,
-          },
-        });
-
-        if (!uploadRes.ok) {
-          throw new Error('Failed to upload video file');
-        }
-
-        setFiles((prev) => prev.map((f) => (f.id === uploadFile.id ? { ...f, progress: 70 } : f)));
-
-        data = {
-          url: presignedData.publicUrl,
-          public_id: presignedData.publicUrl,
-          format: uploadFile.file.type.split('/')[1] || 'mp4',
-          resource_type: 'video',
-          guestName: presignedData.guestName,
-          uploadDate: new Date().toISOString(),
-          height: '480',
-          width: '720',
-        };
-      } else {
+      const data = await (async () => {
         const formData = new FormData();
         formData.append('file', uploadFile.file);
         formData.append('guestName', guestName);
@@ -584,12 +528,14 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
           body: formData,
         });
 
-        data = await res.json();
+        const responseData = await res.json();
 
         if (!res.ok) {
-          throw new Error(data.error || 'Failed to upload file');
+          throw new Error(responseData.error || 'Failed to upload file');
         }
-      }
+
+        return responseData;
+      })();
 
       if (data) {
         setFiles((prev) =>
@@ -778,22 +724,10 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
             <UploadIcon className="h-8 w-8 text-muted-foreground" />
             <div>
               <p className="text-sm font-medium">
-                <span className="md:hidden">
-                  {appConfig.storage === StorageProvider.S3
-                    ? t('upload.chooseOrDragVideo')
-                    : t('upload.chooseOrDrag')}
-                </span>
-                <span className="hidden md:inline">
-                  {appConfig.storage === StorageProvider.S3
-                    ? t('upload.chooseOrDragVideoDesktop')
-                    : t('upload.chooseOrDragDesktop')}
-                </span>
+                <span className="md:hidden">{t('upload.chooseOrDrag')}</span>
+                <span className="hidden md:inline">{t('upload.chooseOrDragDesktop')}</span>
               </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {appConfig.storage === StorageProvider.S3
-                  ? t('upload.supportedFormatsS3')
-                  : t('upload.supportedFormatsCloudinary')}
-              </p>
+              <p className="text-xs text-muted-foreground mt-1">{t('upload.supportedFormats')}</p>
             </div>
           </div>
         ) : (

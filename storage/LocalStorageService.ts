@@ -1,12 +1,6 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import {
-  StorageService,
-  UploadResult,
-  VideoUploadData,
-  PresignedUploadResponse,
-  VideoMetadata,
-} from './StorageService';
+import { StorageService, UploadResult, VideoUploadData } from './StorageService';
 import type { MediaProps } from '../utils/types';
 
 /**
@@ -220,48 +214,5 @@ export class LocalStorageService implements StorageService {
       resource_type: 'video',
       created_at: new Date().toISOString(),
     };
-  }
-
-  /**
-   * Local storage doesn't use presigned URLs.
-   * Returns a direct upload URL to the Next.js upload endpoint.
-   */
-  async generateVideoUploadUrl(_options: VideoUploadData): Promise<PresignedUploadResponse> {
-    throw new Error(
-      'Local storage does not support presigned URLs. Videos are uploaded directly through the server.'
-    );
-  }
-
-  async getVideoMetadata(publicUrl: string): Promise<VideoMetadata> {
-    try {
-      // Extract relative path from /api/media/... URL
-      const relativePath = publicUrl.replace(/^\/api\/media\//, '');
-      const absolutePath = path.join(this.basePath, relativePath);
-
-      // Security: prevent path traversal — ensure resolved path stays within basePath
-      const resolvedBase = path.resolve(this.basePath);
-      const resolvedFile = path.resolve(absolutePath);
-      if (!resolvedFile.startsWith(resolvedBase)) {
-        throw new Error('Invalid path: traversal detected');
-      }
-
-      // Verify the file exists
-      await fs.stat(resolvedFile);
-      const ext = path.extname(resolvedFile).slice(1).toLowerCase() || 'mp4';
-
-      return {
-        width: 720,
-        height: 480,
-        format: ext,
-        duration: undefined,
-      };
-    } catch {
-      return {
-        width: 720,
-        height: 480,
-        format: 'mp4',
-        duration: undefined,
-      };
-    }
   }
 }

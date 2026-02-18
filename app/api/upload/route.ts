@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { appConfig, StorageProvider } from '../../../config';
 import { storage } from '../../../storage';
 import { checkUploadRateLimit, createRateLimitHeaders } from '../../../utils/rateLimit';
 import { ValidationError } from '../../../utils/errors';
@@ -74,22 +73,18 @@ async function quarantineFile(file: File, guestName: string): Promise<void> {
   const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
   const quarantineName = `${timestamp}-${randomSuffix}-${safeFileName}`;
 
-  if (appConfig.storage === StorageProvider.Local) {
-    const basePath = process.env.LOCAL_STORAGE_PATH || '/app/uploads';
-    const quarantineDir = path.join(basePath, 'quarantine');
-    await fs.mkdir(quarantineDir, { recursive: true });
+  const basePath = process.env.LOCAL_STORAGE_PATH || '/app/uploads';
+  const quarantineDir = path.join(basePath, 'quarantine');
+  await fs.mkdir(quarantineDir, { recursive: true });
 
-    const quarantinePath = path.join(quarantineDir, quarantineName);
-    const arrayBuffer = await file.arrayBuffer();
-    await fs.writeFile(quarantinePath, Buffer.from(arrayBuffer));
-  }
+  const quarantinePath = path.join(quarantineDir, quarantineName);
+  const arrayBuffer = await file.arrayBuffer();
+  await fs.writeFile(quarantinePath, Buffer.from(arrayBuffer));
 
-  // For S3 and Cloudinary, log only — uploading suspicious content to cloud
-  // storage is inadvisable without a dedicated quarantine bucket.
   console.warn(
     `[QUARANTINE] Suspicious file from guest "${guestName}": ` +
       `name="${file.name}", type="${file.type}", size=${file.size}, ` +
-      `savedAs="${appConfig.storage === StorageProvider.Local ? quarantineName : 'log-only'}"`
+      `savedAs="${quarantineName}"`
   );
 }
 
@@ -144,60 +139,6 @@ function validateUploadRequest(formData: FormData): { file: File; guestName: str
  * @param body - JSON body containing file metadata
  * @throws {ValidationError} If validation fails
  */
-function validateMetadataRequest(body: unknown): {
-  fileName: string;
-  fileSize: number;
-  fileType: string;
-  guestName: string;
-} {
-  if (!body || typeof body !== 'object') {
-    throw new ValidationError('Invalid request body', 'body');
-  }
-
-  const { fileName, fileSize, fileType, guestName } = body as Record<string, unknown>;
-
-  if (!fileName || typeof fileName !== 'string') {
-    throw new ValidationError('Valid file name is required', 'fileName');
-  }
-
-  if (!fileSize || typeof fileSize !== 'number') {
-    throw new ValidationError('Valid file size is required', 'fileSize');
-  }
-
-  if (!fileType || typeof fileType !== 'string') {
-    throw new ValidationError('Valid file type is required', 'fileType');
-  }
-
-  if (!fileType.startsWith('video/')) {
-    throw new ValidationError('Only video files are supported for this request type', 'fileType');
-  }
-
-  // Server-side file size enforcement for metadata requests
-  if (fileSize > MAX_VIDEO_SIZE) {
-    const sizeMB = Math.round(fileSize / (1024 * 1024));
-    const maxSizeMB = Math.round(MAX_VIDEO_SIZE / (1024 * 1024));
-    throw new ValidationError(
-      `Video file size (${sizeMB}MB) exceeds maximum allowed size of ${maxSizeMB}MB`,
-      'fileSize'
-    );
-  }
-
-  if (typeof guestName !== 'string') {
-    throw new ValidationError('Guest name must be a string', 'guestName');
-  }
-
-  const trimmedGuestName = guestName.trim();
-  if (!trimmedGuestName) {
-    throw new ValidationError('Guest name is required', 'guestName');
-  }
-
-  if (trimmedGuestName.length > 100) {
-    throw new ValidationError('Guest name must be less than 100 characters', 'guestName');
-  }
-
-  return { fileName, fileSize, fileType, guestName: trimmedGuestName };
-}
-
 /**
  * Handles media upload requests using the configured storage provider.
  *
@@ -232,39 +173,7 @@ export async function POST(request: NextRequest): Promise<
     }
 
     // Check content type to determine request format
-    const contentType = request.headers.get('content-type') || '';
-
-    // Handle metadata-only requests for S3 videos (JSON)
-    if (contentType.includes('application/json') && appConfig.storage === StorageProvider.S3) {
-      const body = await request.json();
-      const { fileName, fileSize, fileType, guestName } = validateMetadataRequest(body);
-
-      // Return presigned URL for direct S3 upload
-      const uploadData = await storage.generateVideoUploadUrl({
-        fileName,
-        fileSize,
-        fileType,
-        guestName,
-        videoId: `${Date.now()}-${Math.random().toString(36).substring(7)}`,
-      });
-
-      return NextResponse.json(
-        {
-          url: uploadData.uploadUrl,
-          uploadMethod: 'direct',
-          presignedUrl: uploadData.uploadUrl,
-          publicUrl: uploadData.publicUrl,
-          guestName,
-          fileName,
-        },
-        {
-          status: 200,
-          headers: createRateLimitHeaders(rateLimitResult),
-        }
-      );
-    }
-
-    // Handle Cloudinary uploads or S3 image uploads through Next.js server (FormData)
+    // Handle uploads through Next.js server (FormData)
     const formData = await request.formData().catch(() => {
       throw new ValidationError('Invalid form data');
     });
@@ -288,37 +197,6 @@ export async function POST(request: NextRequest): Promise<
           headers: createRateLimitHeaders(rateLimitResult),
         }
       );
-    }
-
-    // For S3 storage, we need to return presigned URLs for direct uploads to avoid 413 errors
-    if (appConfig.storage === StorageProvider.S3) {
-      // For S3, check if it's a video file that needs presigned URL
-      if (file.type.startsWith('video/')) {
-        // Return presigned URL for direct S3 upload
-        const uploadData = await storage.generateVideoUploadUrl({
-          fileName: file.name,
-          fileSize: file.size,
-          fileType: file.type,
-          guestName,
-          videoId: `${Date.now()}-${Math.random().toString(36).substring(7)}`,
-        });
-
-        return NextResponse.json(
-          {
-            url: uploadData.uploadUrl,
-            uploadMethod: 'direct',
-            presignedUrl: uploadData.uploadUrl,
-            publicUrl: uploadData.publicUrl,
-            guestName,
-            fileName: file.name,
-          },
-          {
-            status: 200,
-            headers: createRateLimitHeaders(rateLimitResult),
-          }
-        );
-      }
-      // For images or small videos, continue with direct upload through Next.js
     }
 
     const uploadResult = await storage.upload(file, guestName);

@@ -3,73 +3,7 @@ const nextConfig = {
   output: 'standalone',
   allowedDevOrigins: process.env.DEV_ORIGIN ? [process.env.DEV_ORIGIN] : [],
   images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'res.cloudinary.com',
-        port: '',
-        pathname: '/**', // Allow all Cloudinary paths
-        search: '',
-      },
-      // Wasabi S3-compatible storage endpoints
-      {
-        protocol: 'https',
-        hostname: 's3.us-east-1.wasabisys.com',
-        port: '',
-        pathname: '/**',
-        search: '',
-      },
-      {
-        protocol: 'https',
-        hostname: 's3.us-east-2.wasabisys.com',
-        port: '',
-        pathname: '/**',
-        search: '',
-      },
-      {
-        protocol: 'https',
-        hostname: 's3.us-west-1.wasabisys.com',
-        port: '',
-        pathname: '/**',
-        search: '',
-      },
-      {
-        protocol: 'https',
-        hostname: 's3.eu-central-1.wasabisys.com',
-        port: '',
-        pathname: '/**',
-        search: '',
-      },
-      {
-        protocol: 'https',
-        hostname: 's3.ap-northeast-1.wasabisys.com',
-        port: '',
-        pathname: '/**',
-        search: '',
-      },
-      {
-        protocol: 'https',
-        hostname: 's3.ap-southeast-1.wasabisys.com',
-        port: '',
-        pathname: '/**',
-        search: '',
-      },
-      // Standard AWS S3 endpoints (if someone wants to use AWS S3 instead of Wasabi)
-      {
-        protocol: 'https',
-        hostname: '*.s3.amazonaws.com',
-        port: '',
-        pathname: '/**',
-        search: '',
-      },
-      {
-        protocol: 'https',
-        hostname: '*.s3.*.amazonaws.com',
-        port: '',
-        pathname: '/**',
-        search: '',
-      },
-    ],
+    remotePatterns: [],
     // Next.js Image optimization settings
     formats: ['image/webp', 'image/avif'], // Modern formats for better compression
     minimumCacheTTL: 86400, // Cache images for 24 hours
@@ -98,10 +32,10 @@ const nextConfig = {
               "default-src 'self'",
               "script-src 'self' 'unsafe-inline'",
               "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: blob: https://res.cloudinary.com https://*.amazonaws.com https://*.wasabisys.com",
-              "media-src 'self' blob: https://res.cloudinary.com https://*.amazonaws.com https://*.wasabisys.com",
+              "img-src 'self' data: blob:",
+              "media-src 'self' blob:",
               "font-src 'self' https://fonts.gstatic.com",
-              "connect-src 'self' https://res.cloudinary.com https://*.amazonaws.com https://*.wasabisys.com",
+              "connect-src 'self'",
               "frame-ancestors 'none'",
               "base-uri 'self'",
               "form-action 'self'",

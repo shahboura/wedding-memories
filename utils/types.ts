@@ -9,7 +9,7 @@ export interface MediaProps {
   height: number;
   /** Media width in pixels */
   width: number;
-  /** Cloudinary public ID for the media */
+  /** Media URL path or identifier */
   public_id: string;
   /** Media file format (jpg, mp4, etc.) */
   format: string;

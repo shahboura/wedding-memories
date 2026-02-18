@@ -8,7 +8,6 @@
 
 import type { MediaProps } from './types';
 import { getImageUrl, getThumbnailUrl, getFullUrl } from './imageUrl';
-import { appConfig, StorageProvider } from '../config';
 
 const urlCache = new Map<string, string>();
 const URL_CACHE_MAX_SIZE = 5000;
@@ -26,21 +25,16 @@ function getOptimizedMediaUrl(
 
   let url: string;
 
-  if (appConfig.storage === StorageProvider.S3 || appConfig.storage === StorageProvider.Local) {
-    // For S3/Local, return the URL directly (already a presigned URL or /api/media/… path)
-    url = publicId;
-  } else {
-    switch (quality) {
-      case 'thumb':
-        url = getThumbnailUrl(publicId, resourceType);
-        break;
-      case 'medium':
-        url = getImageUrl(publicId, resourceType, 720, undefined, 'medium');
-        break;
-      case 'full':
-        url = getFullUrl(publicId, resourceType);
-        break;
-    }
+  switch (quality) {
+    case 'thumb':
+      url = getThumbnailUrl(publicId, resourceType);
+      break;
+    case 'medium':
+      url = getImageUrl(publicId, resourceType, 720, undefined, 'medium');
+      break;
+    case 'full':
+      url = getFullUrl(publicId, resourceType);
+      break;
   }
 
   // Evict oldest entries if cache is full
@@ -119,15 +113,7 @@ export function getOptimizedMediaProps(
   if (item.resource_type === 'video') {
     // For thumbnail context, generate a static image thumbnail instead of video
     if (context === 'thumb') {
-      const thumbnailImageSrc =
-        appConfig.storage === StorageProvider.Cloudinary
-          ? (() => {
-              const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
-              if (!cloudName) return item.public_id;
-              if (item.public_id.startsWith('http')) return item.public_id;
-              return `https://res.cloudinary.com/${cloudName}/video/upload/c_fill,w_180,h_120,so_1.0,f_jpg,q_auto/${item.public_id}`;
-            })()
-          : item.public_id; // S3/Local: use URL directly
+      const thumbnailImageSrc = item.public_id;
 
       return {
         src: thumbnailImageSrc,
@@ -145,14 +131,11 @@ export function getOptimizedMediaProps(
 
     // For S3/Local, use URL directly since we don't have quality transformations
     // For Cloudinary, use optimized quality based on context
-    const videoSrc =
-      appConfig.storage === StorageProvider.Cloudinary
-        ? getOptimizedMediaUrl(
-            item.public_id,
-            item.resource_type,
-            context === 'gallery' ? 'medium' : 'full'
-          )
-        : item.public_id; // S3/Local: use URL directly
+    const videoSrc = getOptimizedMediaUrl(
+      item.public_id,
+      item.resource_type,
+      context === 'gallery' ? 'medium' : 'full'
+    );
 
     return {
       src: videoSrc,
@@ -170,10 +153,7 @@ export function getOptimizedMediaProps(
   }
 
   // It's an image, use appropriate URL handling
-  const imageSrc =
-    appConfig.storage === StorageProvider.Cloudinary
-      ? getOptimizedMediaUrl(item.public_id, item.resource_type, quality)
-      : item.public_id; // S3/Local: use URL directly
+  const imageSrc = getOptimizedMediaUrl(item.public_id, item.resource_type, quality);
 
   return {
     src: imageSrc,
