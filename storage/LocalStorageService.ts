@@ -1,5 +1,6 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import sharp from 'sharp';
 import { StorageService, UploadResult, VideoUploadData } from './StorageService';
 import type { MediaProps } from '../utils/types';
 
@@ -50,6 +51,43 @@ export class LocalStorageService implements StorageService {
     return `/api/media/${relativePath}`;
   }
 
+  private getMetaPath(absolutePath: string): string {
+    return `${absolutePath}.meta.json`;
+  }
+
+  private async generateImageAssets(
+    buffer: Buffer,
+    absoluteDir: string,
+    baseName: string
+  ): Promise<{ width: number; height: number; blurDataUrl: string }> {
+    const image = sharp(buffer).rotate();
+    const metadata = await image.metadata();
+    const width = metadata.width ?? 720;
+    const height = metadata.height ?? 480;
+
+    const thumbDir = path.join(absoluteDir, 'thumb');
+    const mediumDir = path.join(absoluteDir, 'medium');
+    await Promise.all([this.ensureDir(thumbDir), this.ensureDir(mediumDir)]);
+
+    await Promise.all([
+      image
+        .clone()
+        .resize({ width: 400, withoutEnlargement: true })
+        .webp({ quality: 75 })
+        .toFile(path.join(thumbDir, `${baseName}.webp`)),
+      image
+        .clone()
+        .resize({ width: 1080, withoutEnlargement: true })
+        .webp({ quality: 82 })
+        .toFile(path.join(mediumDir, `${baseName}.webp`)),
+    ]);
+
+    const blurBuffer = await image.clone().resize(8).jpeg({ quality: 60 }).toBuffer();
+    const blurDataUrl = `data:image/jpeg;base64,${blurBuffer.toString('base64')}`;
+
+    return { width, height, blurDataUrl };
+  }
+
   /**
    * Determines resource type from file extension.
    */
@@ -62,7 +100,8 @@ export class LocalStorageService implements StorageService {
     const timestamp = Date.now();
     const randomSuffix = Math.random().toString(36).substring(7);
     const fileExtension = path.extname(file.name).slice(1).toLowerCase() || 'jpg';
-    const filename = `${timestamp}-${randomSuffix}.${fileExtension}`;
+    const baseName = `${timestamp}-${randomSuffix}`;
+    const filename = `${baseName}.${fileExtension}`;
 
     const sanitizedGuestName = guestName ? this.sanitizeGuestName(guestName) : 'unknown';
     const relativeDir = sanitizedGuestName;
@@ -73,15 +112,32 @@ export class LocalStorageService implements StorageService {
     await this.ensureDir(absoluteDir);
 
     const arrayBuffer = await file.arrayBuffer();
-    await fs.writeFile(absolutePath, Buffer.from(arrayBuffer));
+    const buffer = Buffer.from(arrayBuffer);
+    await fs.writeFile(absolutePath, buffer);
+
+    let width = 720;
+    let height = 480;
+    let blurDataUrl = '';
+    if (file.type.startsWith('image/')) {
+      const result = await this.generateImageAssets(buffer, absoluteDir, baseName);
+      width = result.width;
+      height = result.height;
+      blurDataUrl = result.blurDataUrl;
+    }
+
+    const metaPath = this.getMetaPath(absolutePath);
+    await fs.writeFile(
+      metaPath,
+      JSON.stringify({ width, height, blurDataUrl, format: fileExtension }, null, 2)
+    );
 
     const mediaUrl = this.getMediaUrl(relativePath);
 
     return {
       url: mediaUrl,
       public_id: mediaUrl,
-      width: 720,
-      height: 480,
+      width,
+      height,
       format: fileExtension,
       resource_type: file.type.startsWith('video/') ? 'video' : 'image',
       created_at: new Date().toISOString(),
@@ -167,6 +223,14 @@ export class LocalStorageService implements StorageService {
 
         const relativePath = path.relative(basePath, fullPath).replace(/\\/g, '/');
         const pathParts = relativePath.split('/');
+        const normalizedPath = relativePath.toLowerCase();
+        if (
+          normalizedPath.includes('/thumb/') ||
+          normalizedPath.includes('/medium/') ||
+          normalizedPath.endsWith('.meta.json')
+        ) {
+          continue;
+        }
         const extractedGuestName = pathParts.length > 1 ? pathParts[0] : 'Unknown Guest';
 
         let stat;
@@ -176,15 +240,36 @@ export class LocalStorageService implements StorageService {
           continue;
         }
 
+        let width = 720;
+        let height = 480;
+        let blurDataUrl: string | undefined;
+        if (this.getResourceType(ext) === 'image') {
+          const metaPath = this.getMetaPath(fullPath);
+          try {
+            const metaRaw = await fs.readFile(metaPath, 'utf-8');
+            const meta = JSON.parse(metaRaw) as {
+              width?: number;
+              height?: number;
+              blurDataUrl?: string;
+            };
+            if (meta.width) width = meta.width;
+            if (meta.height) height = meta.height;
+            if (meta.blurDataUrl) blurDataUrl = meta.blurDataUrl;
+          } catch {
+            // Missing metadata — keep defaults
+          }
+        }
+
         items.push({
           id: id++,
-          height: 480,
-          width: 720,
+          height,
+          width,
           public_id: this.getMediaUrl(relativePath),
           format: ext,
           resource_type: this.getResourceType(ext),
           guestName: extractedGuestName,
           uploadDate: stat.mtime.toISOString(),
+          ...(blurDataUrl ? { blurDataUrl } : {}),
         });
       }
     }
@@ -196,12 +281,19 @@ export class LocalStorageService implements StorageService {
     const sanitizedGuestName = this.sanitizeGuestName(options.guestName);
     const fileExtension = path.extname(options.fileName).slice(1).toLowerCase() || 'mp4';
     const relativeDir = `${sanitizedGuestName}/videos`;
-    const relativePath = `${relativeDir}/${options.videoId}.${fileExtension}`;
+    const baseName = options.videoId;
+    const relativePath = `${relativeDir}/${baseName}.${fileExtension}`;
     const absoluteDir = path.join(this.basePath, relativeDir);
     const absolutePath = path.join(this.basePath, relativePath);
 
     await this.ensureDir(absoluteDir);
     await fs.writeFile(absolutePath, buffer);
+
+    const metaPath = this.getMetaPath(absolutePath);
+    await fs.writeFile(
+      metaPath,
+      JSON.stringify({ width: 720, height: 480, blurDataUrl: '', format: fileExtension }, null, 2)
+    );
 
     const mediaUrl = this.getMediaUrl(relativePath);
 

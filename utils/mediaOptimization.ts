@@ -7,7 +7,6 @@
  */
 
 import type { MediaProps } from './types';
-import { getImageUrl, getThumbnailUrl, getFullUrl } from './imageUrl';
 
 const urlCache = new Map<string, string>();
 const URL_CACHE_MAX_SIZE = 5000;
@@ -25,16 +24,22 @@ function getOptimizedMediaUrl(
 
   let url: string;
 
-  switch (quality) {
-    case 'thumb':
-      url = getThumbnailUrl(publicId, resourceType);
-      break;
-    case 'medium':
-      url = getImageUrl(publicId, resourceType, 720, undefined, 'medium');
-      break;
-    case 'full':
-      url = getFullUrl(publicId, resourceType);
-      break;
+  if (resourceType === 'image') {
+    const match = publicId.match(/^(.*\/)([^/?#]+)\.(\w+)(\?.*)?$/);
+    if (match) {
+      const [, prefix, filename, , suffix = ''] = match;
+      if (quality === 'thumb') {
+        url = `${prefix}thumb/${filename}.webp${suffix}`;
+      } else if (quality === 'medium') {
+        url = `${prefix}medium/${filename}.webp${suffix}`;
+      } else {
+        url = publicId;
+      }
+    } else {
+      url = publicId;
+    }
+  } else {
+    url = publicId;
   }
 
   // Evict oldest entries if cache is full
