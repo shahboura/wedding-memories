@@ -83,6 +83,7 @@ export function StorageAwareMedia({
   const [isDesktop, setIsDesktop] = useState(true);
   const [hasFrame, setHasFrame] = useState(false);
   const isGalleryView = context === 'gallery' ? !controls : false;
+  const isThumb = context === 'thumb';
 
   useEffect(() => {
     const mobile = isMobileDevice();
@@ -95,6 +96,17 @@ export function StorageAwareMedia({
   // This avoids downloading metadata for off-screen videos on mobile data.
   useEffect(() => {
     if (resource_type !== 'video' || context === 'modal') return;
+
+    if (context === 'thumb') {
+      const video = videoRef.current;
+      if (!video) return;
+      setHasFrame(false);
+      if (video.preload !== 'metadata') {
+        video.preload = 'metadata';
+      }
+      video.load();
+      return;
+    }
 
     // Reset frame state when src changes (e.g., gallery refetch assigns new URL)
     setHasFrame(false);
@@ -275,7 +287,7 @@ export function StorageAwareMedia({
         )}
 
         {/* Video placeholder: gradient + icon shown until first frame is extracted */}
-        {!hasFrame && !loadError && context !== 'modal' && (
+        {!hasFrame && !loadError && context !== 'modal' && !isThumb && (
           <div className="absolute inset-0 bg-gradient-to-br from-gray-700 to-gray-900 rounded-lg flex items-center justify-center">
             <div className="bg-white/10 rounded-full p-3 backdrop-blur-sm">
               <Play className="text-white/70 w-6 h-6" fill="white" fillOpacity={0.5} />
@@ -337,8 +349,8 @@ export function StorageAwareMedia({
           onPlay={handlePlay}
           draggable={draggable}
           playsInline
-          muted={isGalleryView}
-          preload={context === 'modal' ? 'auto' : 'none'}
+          muted={isGalleryView || isThumb}
+          preload={context === 'modal' || isThumb ? 'metadata' : 'none'}
           disablePictureInPicture={isMobile}
           onLoadedMetadata={() => {
             // Force show first frame so the browser renders a visible poster

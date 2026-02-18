@@ -117,18 +117,16 @@ export function getOptimizedMediaProps(
   if (item.resource_type === 'video') {
     // For thumbnail context, generate a static image thumbnail instead of video
     if (context === 'thumb') {
-      const thumbnailImageSrc = item.public_id;
-
       return {
-        src: thumbnailImageSrc,
+        src: item.public_id,
         alt: `Wedding video thumbnail${item.guestName && item.guestName !== 'Unknown Guest' ? ` shared by ${item.guestName}` : ''}`,
         width: 180,
         height: 120,
         sizes: getResponsiveMediaSizes(context),
         priority: false,
         loading: 'lazy' as const,
-        resource_type: 'image' as const, // Treat as image for thumbnail display
-        format: 'jpg',
+        resource_type: 'video' as const,
+        format: item.format as string,
         context,
       };
     }
