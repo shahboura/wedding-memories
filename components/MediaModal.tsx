@@ -15,7 +15,7 @@ import {
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
 import { StorageAwareMedia } from './StorageAwareMedia';
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, type RefCallback } from 'react';
 import { useKeypress } from '../hooks/useKeypress';
 import { useSwipeable } from 'react-swipeable';
 import {
@@ -66,6 +66,25 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const mediaContainerRef = useRef<HTMLDivElement>(null);
 
+  // Filmstrip ref callback for native scroll centering
+  const activeThumbRef: RefCallback<HTMLButtonElement> = useCallback(
+    (node: HTMLButtonElement | null) => {
+      if (node) {
+        // Scroll the active thumbnail into the center of the filmstrip.
+        // Use 'instant' on first render (modal open), 'smooth' on navigation.
+        node.scrollIntoView({
+          behavior: filmstripHasScrolled.current ? 'smooth' : 'instant',
+          inline: 'center',
+          block: 'nearest',
+        });
+        filmstripHasScrolled.current = true;
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [currentIndex]
+  );
+  const filmstripHasScrolled = useRef(false);
+
   // UI state
   const [controlsVisible, setControlsVisible] = useState(true);
   const [lastTapTime, setLastTapTime] = useState(0);
@@ -88,6 +107,8 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
     setZoom(1);
     setPanX(0);
     setPanY(0);
+    // First filmstrip scroll after modal open should be instant (no smooth animation)
+    filmstripHasScrolled.current = false;
   }, [initialIndex, isOpen]);
 
   // Reset zoom and pan when media changes
@@ -642,38 +663,36 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
 
               {zoom === 1 && controlsVisible && (
                 <div
-                  className={`fixed inset-x-0 z-60 overflow-hidden bottom-0 pb-[env(safe-area-inset-bottom)] ${isSafariMobile ? 'ios-safari-bottom' : ''}`}
+                  className={`fixed inset-x-0 z-60 bottom-0 pb-[env(safe-area-inset-bottom)] ${isSafariMobile ? 'ios-safari-bottom' : ''}`}
                 >
-                  <motion.div
-                    initial={false}
-                    animate={{
-                      x: `calc(50% - ${(currentIndex + 0.5) * 64}px)`,
+                  <div
+                    className="mt-0 md:mt-6 flex items-center overflow-x-auto scrollbar-hide"
+                    style={{
+                      WebkitOverflowScrolling: 'touch',
+                      scrollSnapType: 'x mandatory',
+                      scrollbarWidth: 'none',
+                      msOverflowStyle: 'none',
                     }}
-                    transition={{ duration: 0.2, ease: 'easeOut' }}
-                    className="mx-auto mt-0 md:mt-6 flex items-center"
                   >
-                    <AnimatePresence initial={false}>
-                      {items.map((item, index) => {
-                        // Virtualize: only render thumbnails within ±5 of current index
-                        if (Math.abs(index - currentIndex) > 5) {
-                          return (
-                            <div
-                              key={index}
-                              className="relative inline-block w-16 md:w-20 h-16 md:h-20 shrink-0"
-                              onClick={() => changeMediaIndex(index)}
-                            />
-                          );
-                        }
-                        const isVideoThumb = item.resource_type === 'video';
-                        return (
-                          <motion.button
-                            animate={{ scale: index === currentIndex ? 1.15 : 1 }}
-                            transition={{ duration: 0.15 }}
-                            onClick={() => changeMediaIndex(index)}
-                            key={index}
-                            className={`${index === currentIndex ? 'z-20 rounded-md' : 'z-10'} ${index === 0 ? 'rounded-l-md' : ''} ${index === items.length - 1 ? 'rounded-r-md' : ''} relative inline-block w-16 md:w-20 h-16 md:h-20 shrink-0 transform-gpu overflow-hidden focus:outline-none`}
-                          >
-                            {isVideoThumb ? (
+                    {/* Leading spacer — centers first item */}
+                    <div className="shrink-0" style={{ width: '50%' }} />
+                    {items.map((item, index) => {
+                      // Only render real content within ±5 of current index; others
+                      // remain as empty placeholders preserving scroll width.
+                      const isNearby = Math.abs(index - currentIndex) <= 5;
+                      const isVideoThumb = item.resource_type === 'video';
+                      return (
+                        <motion.button
+                          ref={index === currentIndex ? activeThumbRef : undefined}
+                          animate={{ scale: index === currentIndex ? 1.15 : 1 }}
+                          transition={{ duration: 0.15 }}
+                          onClick={() => changeMediaIndex(index)}
+                          key={index}
+                          className={`${index === currentIndex ? 'z-20 rounded-md' : 'z-10'} ${index === 0 ? 'rounded-l-md' : ''} ${index === items.length - 1 ? 'rounded-r-md' : ''} relative inline-block w-16 md:w-20 h-16 md:h-20 shrink-0 transform-gpu overflow-hidden focus:outline-none`}
+                          style={{ scrollSnapAlign: 'center' }}
+                        >
+                          {isNearby ? (
+                            isVideoThumb ? (
                               <div
                                 className={`${index === currentIndex ? 'brightness-110' : 'brightness-50 contrast-125'} h-full w-full bg-gradient-to-br from-gray-700 to-gray-900 flex items-center justify-center transition`}
                               >
@@ -691,12 +710,14 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
                                 })}
                                 className={`${index === currentIndex ? 'brightness-110 hover:brightness-110' : 'brightness-50 contrast-125 hover:brightness-75'} h-full transform object-cover transition`}
                               />
-                            )}
-                          </motion.button>
-                        );
-                      })}
-                    </AnimatePresence>
-                  </motion.div>
+                            )
+                          ) : null}
+                        </motion.button>
+                      );
+                    })}
+                    {/* Trailing spacer — centers last item */}
+                    <div className="shrink-0" style={{ width: '50%' }} />
+                  </div>
                 </div>
               )}
             </div>
