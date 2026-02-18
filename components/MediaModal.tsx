@@ -304,7 +304,9 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
         setIsPinching(true);
         setInitialDistance(getDistance(e.touches));
         setInitialZoom(zoom);
-        e.preventDefault();
+        if (e.cancelable) {
+          e.preventDefault();
+        }
       }
     },
     [isVideo, zoom, getDistance, panX, panY]
@@ -334,14 +336,18 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
           const newZoom = Math.max(0.5, Math.min(5, initialZoom * scale));
           setZoom(newZoom);
         }
-        e.preventDefault();
+        if (e.cancelable) {
+          e.preventDefault();
+        }
       } else if (isDragging && e.touches.length === 1 && zoom > 1) {
         // Handle pan when zoomed
         const newPanX = e.touches[0].clientX - dragStart.x;
         const newPanY = e.touches[0].clientY - dragStart.y;
         setPanX(newPanX);
         setPanY(newPanY);
-        e.preventDefault();
+        if (e.cancelable) {
+          e.preventDefault();
+        }
       }
     },
     [
@@ -446,8 +452,9 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
     delta: 50,
     swipeDuration: 300,
     preventScrollOnSwipe: true,
-    trackTouch: true,
+    trackTouch: isTouchDevice,
     trackMouse: true,
+    touchEventOptions: isTouchDevice ? { passive: false } : undefined,
   });
 
   if (!isOpen || !currentItem) return null;
