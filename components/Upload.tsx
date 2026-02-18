@@ -135,6 +135,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const longPressTriggeredRef = useRef(false);
   const filesRef = useRef(files);
+  const refreshAbortRef = useRef<AbortController | null>(null);
 
   const { toast } = useToast();
 
@@ -170,6 +171,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
   useEffect(() => {
     return () => {
       revokeThumbnails(filesRef.current);
+      refreshAbortRef.current?.abort();
     };
   }, []);
 
@@ -658,8 +660,12 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
         if (appConfig.guestIsolation && guestName) {
           url += `?guest=${encodeURIComponent(guestName)}`;
         }
+        refreshAbortRef.current?.abort();
+        const controller = new AbortController();
+        refreshAbortRef.current = controller;
         const response = await fetch(url, {
           cache: 'no-store', // avoid stale ISR cache after upload (prevents empty gallery)
+          signal: controller.signal,
         });
         if (response.ok) {
           const freshMedia = await response.json();
@@ -667,7 +673,12 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
           refreshMedia();
         }
       } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          return;
+        }
         console.error('Failed to refresh gallery after upload:', error);
+      } finally {
+        refreshAbortRef.current = null;
       }
     }
   };
