@@ -103,6 +103,17 @@ Summaries should be added to this AGENTS.md file under a "Session Summaries" sec
 
 ## Session Summaries
 
+### 2026-02-20 01:00 - Add /api/health endpoint for Docker healthcheck
+
+**Agent:** orchestrator  
+**Summary:** Added unauthenticated health check endpoint and updated Docker healthcheck to use it.
+
+- Created `app/api/health/route.ts` returning `{ status: 'ok', uptime: N }` — no event token required, intentionally public for container orchestration
+- Updated `docker-compose.yml` healthcheck from `/api/photos` (requires auth, fails when `EVENT_TOKEN` is set) to `/api/health`
+- Investigated WebP files in main upload folder — confirmed intentional: originals preserved as-is, sharp only generates WebP variants in `thumb/` and `medium/` subdirectories
+- `docker-compose.dev.yml` intentionally left without healthcheck (local hot-reload, not orchestration)
+- Verified: `pnpm type-check` and `pnpm lint` both pass with zero errors/warnings
+
 ### 2026-02-20 00:15 - Fix Firefox video seek DOMException and flicker
 
 **Agent:** orchestrator  
