@@ -13,7 +13,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { StorageAwareMedia } from './StorageAwareMedia';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useKeypress } from '../hooks/useKeypress';
@@ -33,19 +33,6 @@ import type { MediaProps } from '../utils/types';
 import { getOptimizedMediaProps, prefetchMediaOnInteraction } from '../utils/mediaOptimization';
 
 import { useI18n } from './I18nProvider';
-
-// Inline animation variants — enter/center are identical (no entrance animation),
-// only exit fades out.
-const variants = {
-  center: {
-    x: 0,
-    opacity: 1,
-  },
-  exit: {
-    x: 0,
-    opacity: 0,
-  },
-};
 
 interface MediaModalProps {
   items: MediaProps[];
@@ -73,39 +60,45 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
   const isProgrammaticScroll = useRef(false);
   // Map of index → button element for nearest-center lookup on user scroll
   const thumbElements = useRef<Map<number, HTMLButtonElement>>(new Map());
+  // Keep a ref-mirror of currentIndex so scroll listeners never hold stale closures
+  const currentIndexRef = useRef(currentIndex);
+  useEffect(() => {
+    currentIndexRef.current = currentIndex;
+  }, [currentIndex]);
 
-  // Combined ref callback: stores every button in thumbElements,
-  // and scrolls the active one into view when currentIndex changes.
-  const thumbRefCallback = useCallback(
+  // Stable ref callback — only maintains the element map, no scrolling logic.
+  // This never changes identity so React never churns refs on re-render.
+  const setThumbRef = useCallback(
     (index: number) => (node: HTMLButtonElement | null) => {
-      // Maintain the element map for scroll-position lookup
       if (node) {
         thumbElements.current.set(index, node);
       } else {
         thumbElements.current.delete(index);
       }
-
-      // Scroll the active thumbnail into the center of the filmstrip
-      if (node && index === currentIndex) {
-        const isFirstScroll = !filmstripHasScrolled.current;
-        isProgrammaticScroll.current = true;
-        node.scrollIntoView({
-          behavior: isFirstScroll ? 'instant' : 'smooth',
-          inline: 'center',
-          block: 'nearest',
-        });
-        filmstripHasScrolled.current = true;
-        // Release the guard after the scroll animation settles
-        setTimeout(
-          () => {
-            isProgrammaticScroll.current = false;
-          },
-          isFirstScroll ? 0 : 350
-        );
-      }
     },
-    [currentIndex]
+    []
   );
+
+  // Scroll the active thumbnail into view when currentIndex changes.
+  // Separated from ref callback to avoid re-running for every button on each render.
+  useEffect(() => {
+    const node = thumbElements.current.get(currentIndex);
+    if (!node) return;
+
+    const isFirstScroll = !filmstripHasScrolled.current;
+    isProgrammaticScroll.current = true;
+    node.scrollIntoView({
+      behavior: isFirstScroll ? 'instant' : 'smooth',
+      inline: 'center',
+      block: 'nearest',
+    });
+    filmstripHasScrolled.current = true;
+    const timeout = isFirstScroll ? 0 : 350;
+    const timer = setTimeout(() => {
+      isProgrammaticScroll.current = false;
+    }, timeout);
+    return () => clearTimeout(timer);
+  }, [currentIndex]);
 
   // UI state
   const [controlsVisible, setControlsVisible] = useState(true);
@@ -232,8 +225,15 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
     },
     [resetView]
   );
+  // Stable ref for changeMediaIndex so scroll listener doesn't re-register on every render
+  const changeMediaIndexRef = useRef(changeMediaIndex);
+  useEffect(() => {
+    changeMediaIndexRef.current = changeMediaIndex;
+  }, [changeMediaIndex]);
 
-  // Sync currentIndex when user manually scrolls the filmstrip to a new snap position
+  // Sync currentIndex when user manually scrolls the filmstrip to a new snap position.
+  // Uses refs for currentIndex and changeMediaIndex so the listener is registered once
+  // and never holds stale closures — no teardown/re-register on every index change.
   useEffect(() => {
     const container = filmstripRef.current;
     if (!container) return;
@@ -244,7 +244,7 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
       const containerRect = container.getBoundingClientRect();
       const centerX = containerRect.left + containerRect.width / 2;
 
-      let closestIndex = currentIndex;
+      let closestIndex = currentIndexRef.current;
       let closestDistance = Infinity;
 
       thumbElements.current.forEach((el, index) => {
@@ -257,8 +257,8 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
         }
       });
 
-      if (closestIndex !== currentIndex) {
-        changeMediaIndex(closestIndex);
+      if (closestIndex !== currentIndexRef.current) {
+        changeMediaIndexRef.current(closestIndex);
       }
     };
 
@@ -280,7 +280,7 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
       container.removeEventListener(eventName, handler);
       clearTimeout(scrollTimer);
     };
-  }, [currentIndex, changeMediaIndex]);
+  }, []); // stable — all mutable state accessed via refs
 
   // Prefetch adjacent media for faster switching
   // Uses <link rel="prefetch"> instead of hidden <video> elements to avoid
@@ -558,242 +558,229 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
             controls
           </DialogDescription>
 
-          <MotionConfig
-            transition={{
-              x: { type: 'tween', duration: 0.2, ease: 'easeOut' },
-              opacity: { duration: 0.15 },
-            }}
+          <div
+            className="relative z-50 flex w-full max-w-7xl items-center justify-center p-4"
+            {...(zoom === 1 && !isPinching && !isVideoPlaying ? handlers : {})}
           >
-            <div
-              className="relative z-50 flex w-full max-w-7xl items-center justify-center p-4"
-              {...(zoom === 1 && !isPinching && !isVideoPlaying ? handlers : {})}
-            >
-              <div className="w-full h-full flex items-center justify-center">
-                <div
-                  ref={mediaContainerRef}
-                  className={`relative w-full max-w-full overflow-hidden flex items-center justify-center ${
-                    zoom === 1 && controlsVisible ? 'h-[calc(100dvh-12rem)]' : 'h-[90dvh]' // Full height when zoomed or controls hidden
-                  }`}
-                  onTouchStart={handleTouchStart}
-                  onTouchMove={handleTouchMove}
-                  onTouchEnd={handleTouchEnd}
-                  onMouseDown={handleMouseDown}
-                  onMouseMove={handleMouseMove}
-                  onMouseUp={handleMouseUp}
-                  onMouseLeave={handleMouseUp}
-                  onWheel={handleWheel}
-                  style={{
-                    touchAction: zoom > 1 || isPinching ? 'none' : 'auto',
-                    cursor: zoom > 1 && !isVideo ? (isDragging ? 'grabbing' : 'grab') : 'default',
-                    userSelect: 'none',
-                  }}
-                >
-                  {controlsVisible && (
-                    <div className="fixed top-2 md:top-4 right-2 md:right-5 z-20 rounded-full bg-black/50 backdrop-blur-lg p-1">
-                      <button
-                        onClick={onClose}
+            <div className="w-full h-full flex items-center justify-center">
+              <div
+                ref={mediaContainerRef}
+                className={`relative w-full max-w-full overflow-hidden flex items-center justify-center ${
+                  zoom === 1 && controlsVisible ? 'h-[calc(100dvh-12rem)]' : 'h-[90dvh]' // Full height when zoomed or controls hidden
+                }`}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseUp}
+                onWheel={handleWheel}
+                style={{
+                  touchAction: zoom > 1 || isPinching ? 'none' : 'auto',
+                  cursor: zoom > 1 && !isVideo ? (isDragging ? 'grabbing' : 'grab') : 'default',
+                  userSelect: 'none',
+                }}
+              >
+                {controlsVisible && (
+                  <div className="fixed top-2 md:top-4 right-2 md:right-5 z-20 rounded-full bg-black/50 backdrop-blur-lg p-1">
+                    <button
+                      onClick={onClose}
+                      className="rounded-full p-3 text-white/75 transition hover:bg-black/50 hover:text-white"
+                      title={t('modal.closeModal')}
+                      aria-label={t('modal.closeModal')}
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                )}
+
+                {controlsVisible && (
+                  <>
+                    <div className="fixed top-2 md:top-4 left-2 md:left-5 z-20 flex items-center gap-1 rounded-full bg-black/50 backdrop-blur-lg p-1">
+                      <a
+                        href={currentItem.public_id}
                         className="rounded-full p-3 text-white/75 transition hover:bg-black/50 hover:text-white"
-                        title={t('modal.closeModal')}
-                        aria-label={t('modal.closeModal')}
+                        target="_blank"
+                        title={t('modal.openFullsize')}
+                        aria-label={t('modal.openFullsize')}
+                        rel="noreferrer"
                       >
-                        <X className="h-5 w-5" />
+                        <ExternalLink className="h-5 w-5" />
+                      </a>
+                      <button
+                        onClick={() => {
+                          const link = document.createElement('a');
+                          link.href = currentItem.public_id;
+                          link.download = `wedding-photo-${currentIndex + 1}.${currentItem.format}`;
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                        }}
+                        className="rounded-full p-3 text-white/75 transition hover:bg-black/50 hover:text-white"
+                        title={t('modal.downloadFullsize')}
+                        aria-label={t('modal.downloadFullsize')}
+                      >
+                        <Download className="h-5 w-5" />
                       </button>
                     </div>
-                  )}
 
-                  {controlsVisible && (
-                    <>
-                      <div className="fixed top-2 md:top-4 left-2 md:left-5 z-20 flex items-center gap-1 rounded-full bg-black/50 backdrop-blur-lg p-1">
-                        <a
-                          href={currentItem.public_id}
-                          className="rounded-full p-3 text-white/75 transition hover:bg-black/50 hover:text-white"
-                          target="_blank"
-                          title={t('modal.openFullsize')}
-                          aria-label={t('modal.openFullsize')}
-                          rel="noreferrer"
-                        >
-                          <ExternalLink className="h-5 w-5" />
-                        </a>
+                    {!isVideo && (
+                      <div className="fixed left-1/2 -translate-x-1/2 top-2 md:top-4 z-20 flex items-center gap-1 rounded-full bg-black/50 backdrop-blur-lg p-1 pointer-events-auto zoom-controls">
                         <button
-                          onClick={() => {
-                            const link = document.createElement('a');
-                            link.href = currentItem.public_id;
-                            link.download = `wedding-photo-${currentIndex + 1}.${currentItem.format}`;
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                          }}
-                          className="rounded-full p-3 text-white/75 transition hover:bg-black/50 hover:text-white"
-                          title={t('modal.downloadFullsize')}
-                          aria-label={t('modal.downloadFullsize')}
+                          onClick={zoomOut}
+                          disabled={zoom <= 0.5}
+                          className="rounded-full p-3 text-white/75 transition hover:bg-black/50 hover:text-white disabled:opacity-50"
+                          title={t('modal.zoomOut')}
+                          aria-label={t('modal.zoomOut')}
                         >
-                          <Download className="h-5 w-5" />
+                          <ZoomOut className="h-5 w-5" />
                         </button>
+                        <span className="px-2 text-sm text-white/90 min-w-[3rem] text-center font-medium">
+                          {Math.round(zoom * 100)}%
+                        </span>
+                        <button
+                          onClick={zoomIn}
+                          disabled={zoom >= 5}
+                          className="rounded-full p-3 text-white/75 transition hover:bg-black/50 hover:text-white disabled:opacity-50"
+                          title={t('modal.zoomIn')}
+                          aria-label={t('modal.zoomIn')}
+                        >
+                          <ZoomIn className="h-5 w-5" />
+                        </button>
+                        {zoom !== 1 && (
+                          <button
+                            onClick={resetView}
+                            className="rounded-full p-3 text-white/75 transition hover:bg-black/50 hover:text-white ml-0.5"
+                            title={t('modal.resetZoom')}
+                            aria-label={t('modal.resetZoom')}
+                          >
+                            <RotateCcw className="h-5 w-5" />
+                          </button>
+                        )}
                       </div>
+                    )}
+                  </>
+                )}
 
-                      {!isVideo && (
-                        <div className="fixed left-1/2 -translate-x-1/2 top-2 md:top-4 z-20 flex items-center gap-1 rounded-full bg-black/50 backdrop-blur-lg p-1 pointer-events-auto zoom-controls">
-                          <button
-                            onClick={zoomOut}
-                            disabled={zoom <= 0.5}
-                            className="rounded-full p-3 text-white/75 transition hover:bg-black/50 hover:text-white disabled:opacity-50"
-                            title={t('modal.zoomOut')}
-                            aria-label={t('modal.zoomOut')}
-                          >
-                            <ZoomOut className="h-5 w-5" />
-                          </button>
-                          <span className="px-2 text-sm text-white/90 min-w-[3rem] text-center font-medium">
-                            {Math.round(zoom * 100)}%
-                          </span>
-                          <button
-                            onClick={zoomIn}
-                            disabled={zoom >= 5}
-                            className="rounded-full p-3 text-white/75 transition hover:bg-black/50 hover:text-white disabled:opacity-50"
-                            title={t('modal.zoomIn')}
-                            aria-label={t('modal.zoomIn')}
-                          >
-                            <ZoomIn className="h-5 w-5" />
-                          </button>
-                          {zoom !== 1 && (
-                            <button
-                              onClick={resetView}
-                              className="rounded-full p-3 text-white/75 transition hover:bg-black/50 hover:text-white ml-0.5"
-                              title={t('modal.resetZoom')}
-                              aria-label={t('modal.resetZoom')}
-                            >
-                              <RotateCcw className="h-5 w-5" />
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </>
-                  )}
+                {!isTouchDevice && currentIndex > 0 && zoom === 1 && controlsVisible && (
+                  <button
+                    onClick={() => changeMediaIndex(currentIndex - 1)}
+                    className="absolute left-2 top-1/2 -translate-y-1/2 z-10 rounded-full bg-black/50 p-2 text-white/75 backdrop-blur-lg transition hover:bg-black/75 hover:text-white"
+                    title={t('modal.previousMedia')}
+                    aria-label={t('modal.previousMedia')}
+                  >
+                    <ChevronLeft className="h-6 w-6" />
+                  </button>
+                )}
 
-                  {!isTouchDevice && currentIndex > 0 && zoom === 1 && controlsVisible && (
+                {!isTouchDevice &&
+                  currentIndex + 1 < items.length &&
+                  zoom === 1 &&
+                  controlsVisible && (
                     <button
-                      onClick={() => changeMediaIndex(currentIndex - 1)}
-                      className="absolute left-2 top-1/2 -translate-y-1/2 z-10 rounded-full bg-black/50 p-2 text-white/75 backdrop-blur-lg transition hover:bg-black/75 hover:text-white"
-                      title={t('modal.previousMedia')}
-                      aria-label={t('modal.previousMedia')}
+                      onClick={() => changeMediaIndex(currentIndex + 1)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 z-10 rounded-full bg-black/50 p-2 text-white/75 backdrop-blur-lg transition hover:bg-black/75 hover:text-white"
+                      title={t('modal.nextMedia')}
+                      aria-label={t('modal.nextMedia')}
                     >
-                      <ChevronLeft className="h-6 w-6" />
+                      <ChevronRight className="h-6 w-6" />
                     </button>
                   )}
 
-                  {!isTouchDevice &&
-                    currentIndex + 1 < items.length &&
-                    zoom === 1 &&
-                    controlsVisible && (
-                      <button
-                        onClick={() => changeMediaIndex(currentIndex + 1)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 z-10 rounded-full bg-black/50 p-2 text-white/75 backdrop-blur-lg transition hover:bg-black/75 hover:text-white"
-                        title={t('modal.nextMedia')}
-                        aria-label={t('modal.nextMedia')}
-                      >
-                        <ChevronRight className="h-6 w-6" />
-                      </button>
-                    )}
-
-                  <AnimatePresence initial={false} mode="wait">
-                    <motion.div
-                      key={`${currentIndex}-${currentItem.id}`}
-                      variants={variants}
-                      initial="center"
-                      animate="center"
-                      exit="exit"
-                      className="absolute inset-0 flex items-center justify-center"
-                    >
-                      <div
-                        className="flex items-center justify-center w-full h-full"
-                        style={{
-                          transform: !isVideo
-                            ? `translate(${panX}px, ${panY}px) scale(${zoom})`
-                            : 'scale(1)',
-                          transition: isDragging || isPinching ? 'none' : 'transform 0.1s ease-out',
-                          transformOrigin: 'center center',
-                        }}
-                      >
-                        {currentMediaProps && (
-                          <StorageAwareMedia
-                            {...currentMediaProps}
-                            context="modal"
-                            controls={isVideo}
-                            className={`${
-                              isVideo
-                                ? 'w-full h-full max-w-full max-h-full object-contain rounded-lg'
-                                : 'max-w-full max-h-full w-auto h-auto object-contain'
-                            } select-none mx-auto my-auto`}
-                            draggable={false}
-                          />
-                        )}
-                      </div>
-                    </motion.div>
-                  </AnimatePresence>
-                </div>
-              </div>
-
-              {zoom === 1 && controlsVisible && (
                 <div
-                  className={`fixed inset-x-0 z-60 bottom-0 pb-[env(safe-area-inset-bottom)] ${isSafariMobile ? 'ios-safari-bottom' : ''}`}
+                  key={`${currentIndex}-${currentItem.id}`}
+                  className="absolute inset-0 flex items-center justify-center"
                 >
                   <div
-                    ref={filmstripRef}
-                    className="mt-0 md:mt-6 flex items-center overflow-x-auto scrollbar-hide"
+                    className="flex items-center justify-center w-full h-full"
                     style={{
-                      WebkitOverflowScrolling: 'touch',
-                      scrollSnapType: 'x mandatory',
-                      scrollbarWidth: 'none',
-                      msOverflowStyle: 'none',
+                      transform: !isVideo
+                        ? `translate(${panX}px, ${panY}px) scale(${zoom})`
+                        : 'scale(1)',
+                      transition: isDragging || isPinching ? 'none' : 'transform 0.1s ease-out',
+                      transformOrigin: 'center center',
                     }}
                   >
-                    {/* Leading spacer — centers first item */}
-                    <div className="shrink-0" style={{ width: '50%' }} />
-                    {items.map((item, index) => {
-                      // Only render real content within ±5 of current index; others
-                      // remain as empty placeholders preserving scroll width.
-                      const isNearby = Math.abs(index - currentIndex) <= 5;
-                      const isVideoThumb = item.resource_type === 'video';
-                      return (
-                        <motion.button
-                          ref={thumbRefCallback(index)}
-                          animate={{ scale: index === currentIndex ? 1.15 : 1 }}
-                          transition={{ duration: 0.15 }}
-                          onClick={() => changeMediaIndex(index)}
-                          key={index}
-                          className={`${index === currentIndex ? 'z-20 rounded-md' : 'z-10'} ${index === 0 ? 'rounded-l-md' : ''} ${index === items.length - 1 ? 'rounded-r-md' : ''} relative inline-block w-16 md:w-20 h-16 md:h-20 shrink-0 transform-gpu overflow-hidden focus:outline-none`}
-                          style={{ scrollSnapAlign: 'center' }}
-                        >
-                          {isNearby ? (
-                            isVideoThumb ? (
-                              <div
-                                className={`${index === currentIndex ? 'brightness-110' : 'brightness-50 contrast-125'} h-full w-full bg-gradient-to-br from-gray-700 to-gray-900 flex items-center justify-center transition`}
-                              >
-                                <Play
-                                  className="text-white/70 w-4 h-4"
-                                  fill="white"
-                                  fillOpacity={0.5}
-                                />
-                              </div>
-                            ) : (
-                              <StorageAwareMedia
-                                {...getOptimizedMediaProps(item, 'thumb', {
-                                  priority: Math.abs(index - currentIndex) <= 2,
-                                  quality: 'thumb',
-                                })}
-                                className={`${index === currentIndex ? 'brightness-110 hover:brightness-110' : 'brightness-50 contrast-125 hover:brightness-75'} h-full transform object-cover transition`}
-                              />
-                            )
-                          ) : null}
-                        </motion.button>
-                      );
-                    })}
-                    {/* Trailing spacer — centers last item */}
-                    <div className="shrink-0" style={{ width: '50%' }} />
+                    {currentMediaProps && (
+                      <StorageAwareMedia
+                        {...currentMediaProps}
+                        context="modal"
+                        controls={isVideo}
+                        className={`${
+                          isVideo
+                            ? 'w-full h-full max-w-full max-h-full object-contain rounded-lg'
+                            : 'max-w-full max-h-full w-auto h-auto object-contain'
+                        } select-none mx-auto my-auto`}
+                        draggable={false}
+                      />
+                    )}
                   </div>
                 </div>
-              )}
+              </div>
             </div>
-          </MotionConfig>
+
+            {zoom === 1 && controlsVisible && (
+              <div
+                className={`fixed inset-x-0 z-60 bottom-0 pb-[env(safe-area-inset-bottom)] ${isSafariMobile ? 'ios-safari-bottom' : ''}`}
+              >
+                <div
+                  ref={filmstripRef}
+                  className="mt-0 md:mt-6 flex items-center overflow-x-auto scrollbar-hide"
+                  style={{
+                    WebkitOverflowScrolling: 'touch',
+                    scrollSnapType: 'x mandatory',
+                    scrollbarWidth: 'none',
+                    msOverflowStyle: 'none',
+                  }}
+                >
+                  {/* Leading spacer — centers first item */}
+                  <div className="shrink-0" style={{ width: '50%' }} />
+                  {items.map((item, index) => {
+                    // Only render real content within ±5 of current index; others
+                    // remain as empty placeholders preserving scroll width.
+                    const isNearby = Math.abs(index - currentIndex) <= 5;
+                    const isVideoThumb = item.resource_type === 'video';
+                    return (
+                      <motion.button
+                        ref={setThumbRef(index)}
+                        animate={{ scale: index === currentIndex ? 1.15 : 1 }}
+                        transition={{ duration: 0.15 }}
+                        onClick={() => changeMediaIndex(index)}
+                        key={index}
+                        className={`${index === currentIndex ? 'z-20 rounded-md' : 'z-10'} ${index === 0 ? 'rounded-l-md' : ''} ${index === items.length - 1 ? 'rounded-r-md' : ''} relative inline-block w-16 md:w-20 h-16 md:h-20 shrink-0 transform-gpu overflow-hidden focus:outline-none`}
+                        style={{ scrollSnapAlign: 'center' }}
+                      >
+                        {isNearby ? (
+                          isVideoThumb ? (
+                            <div
+                              className={`${index === currentIndex ? 'brightness-110' : 'brightness-50 contrast-125'} h-full w-full bg-gradient-to-br from-gray-700 to-gray-900 flex items-center justify-center transition`}
+                            >
+                              <Play
+                                className="text-white/70 w-4 h-4"
+                                fill="white"
+                                fillOpacity={0.5}
+                              />
+                            </div>
+                          ) : (
+                            <StorageAwareMedia
+                              {...getOptimizedMediaProps(item, 'thumb', {
+                                priority: Math.abs(index - currentIndex) <= 2,
+                                quality: 'thumb',
+                              })}
+                              className={`${index === currentIndex ? 'brightness-110 hover:brightness-110' : 'brightness-50 contrast-125 hover:brightness-75'} h-full transform object-cover transition`}
+                            />
+                          )
+                        ) : null}
+                      </motion.button>
+                    );
+                  })}
+                  {/* Trailing spacer — centers last item */}
+                  <div className="shrink-0" style={{ width: '50%' }} />
+                </div>
+              </div>
+            )}
+          </div>
         </DialogPrimitive.Content>
       </DialogPortal>
     </Dialog>
