@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { storage } from '../../../storage';
 import { appConfig } from '../../../config';
 import { checkPhotosRateLimit, createRateLimitHeaders } from '../../../utils/rateLimit';
+import { isEventTokenRequired, isEventTokenValid } from '../../../utils/eventToken';
 import type { MediaProps, ApiErrorResponse } from '../../../utils/types';
 
 /**
@@ -32,6 +33,14 @@ export async function GET(
   request: NextRequest
 ): Promise<NextResponse<MediaProps[] | ApiErrorResponse>> {
   try {
+    if (isEventTokenRequired() && !isEventTokenValid(request)) {
+      const errorResponse: ApiErrorResponse = {
+        error: 'Unauthorized access',
+        details: 'A valid event token is required to view the gallery.',
+      };
+      return NextResponse.json(errorResponse, { status: 401 });
+    }
+
     // Rate limit check
     const rateLimitResult = checkPhotosRateLimit(request);
     if (!rateLimitResult.success) {

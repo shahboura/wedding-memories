@@ -60,7 +60,7 @@ import {
 } from '@/components/ui/dialog';
 
 import type { UploadFile } from '../utils/types';
-import { formatFileSize, getCompressionInfo } from '../utils/clientUtils';
+import { formatFileSize, getCompressionInfo, getEventToken } from '../utils/clientUtils';
 import { useI18n } from './I18nProvider';
 import { useSearchParams } from 'next/navigation';
 
@@ -560,9 +560,11 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
         // No real progress events from fetch(); show 50% to indicate upload started
         setFiles((prev) => prev.map((f) => (f.id === uploadFile.id ? { ...f, progress: 50 } : f)));
 
+        const eventToken = getEventToken();
         const res = await fetch('/api/upload', {
           method: 'POST',
           body: formData,
+          headers: eventToken ? { 'x-event-token': eventToken } : undefined,
         });
 
         const responseData = await res.json();
@@ -658,7 +660,10 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
         if (appConfig.guestIsolation && guestName) {
           url += `?guest=${encodeURIComponent(guestName)}`;
         }
-        const response = await fetch(url);
+        const eventToken = getEventToken();
+        const response = await fetch(url, {
+          headers: eventToken ? { 'x-event-token': eventToken } : undefined,
+        });
         if (response.ok) {
           const freshMedia = await response.json();
           setMedia(freshMedia);

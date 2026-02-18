@@ -1,3 +1,5 @@
+import { getEventTokenForRateLimit } from './eventToken';
+
 /**
  * Professional in-memory rate limiter implementation
  * Thread-safe, memory-efficient, and production-ready for serverless environments
@@ -204,12 +206,23 @@ function getClientIdentifier(request: Request): string {
   return 'unknown';
 }
 
+function getRateLimitIdentifier(request: Request): string {
+  const ipIdentifier = getClientIdentifier(request);
+  const eventToken = getEventTokenForRateLimit(request);
+
+  if (eventToken) {
+    return `${eventToken}:${ipIdentifier}`;
+  }
+
+  return ipIdentifier;
+}
+
 /**
  * Photos API rate limiting
  * Prevents scraping/abuse of the gallery listing endpoint
  */
 export function checkPhotosRateLimit(request: Request): RateLimitResult {
-  const identifier = getClientIdentifier(request);
+  const identifier = getRateLimitIdentifier(request);
   return photosRateLimit.check(identifier);
 }
 
@@ -220,7 +233,7 @@ export function checkPhotosRateLimit(request: Request): RateLimitResult {
 export function checkUploadRateLimit(request: Request): RateLimitResult & {
   message?: string;
 } {
-  const identifier = getClientIdentifier(request);
+  const identifier = getRateLimitIdentifier(request);
 
   const result = uploadRateLimit.check(identifier);
   if (!result.success) {

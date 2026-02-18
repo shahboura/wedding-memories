@@ -3,6 +3,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { storage } from '../../../storage';
 import { checkUploadRateLimit, createRateLimitHeaders } from '../../../utils/rateLimit';
+import { isEventTokenRequired, isEventTokenValid } from '../../../utils/eventToken';
 import { ValidationError } from '../../../utils/errors';
 import type { ApiErrorResponse } from '../../../utils/types';
 
@@ -155,6 +156,14 @@ export async function POST(request: NextRequest): Promise<
   >
 > {
   try {
+    if (isEventTokenRequired() && !isEventTokenValid(request)) {
+      const errorResponse: ApiErrorResponse = {
+        error: 'Unauthorized upload',
+        details: 'A valid event token is required to upload media.',
+      };
+      return NextResponse.json(errorResponse, { status: 401 });
+    }
+
     const rateLimitResult = checkUploadRateLimit(request);
     if (!rateLimitResult.success) {
       const errorResponse: ApiErrorResponse = {

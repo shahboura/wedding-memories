@@ -21,19 +21,41 @@ export function getCompressionInfo(fileSizeBytes: number): {
   estimatedSizeReduction: string;
 } {
   const eightMB = 8 * 1024 * 1024;
-  
+
   if (fileSizeBytes <= eightMB) {
     return {
       willCompress: false,
       estimatedSizeReduction: '0%',
     };
   }
-  
+
   // Rough estimation: JPEG compression typically reduces by 60-80%
-  const estimatedReduction = Math.min(Math.round((fileSizeBytes - eightMB) / fileSizeBytes * 100), 80);
-  
+  const estimatedReduction = Math.min(
+    Math.round(((fileSizeBytes - eightMB) / fileSizeBytes) * 100),
+    80
+  );
+
   return {
     willCompress: true,
     estimatedSizeReduction: `~${estimatedReduction}%`,
   };
+}
+
+export function getEventToken(): string | null {
+  if (typeof window === 'undefined') return null;
+
+  const fromStorage = window.localStorage.getItem('event_token');
+  if (fromStorage && fromStorage.trim()) return fromStorage.trim();
+
+  const cookieMatch = document.cookie
+    .split(';')
+    .map((part) => part.trim())
+    .find((part) => part.startsWith('event_token='));
+
+  if (cookieMatch) {
+    const value = cookieMatch.split('=')[1];
+    if (value) return decodeURIComponent(value);
+  }
+
+  return null;
 }
