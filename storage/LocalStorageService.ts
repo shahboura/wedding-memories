@@ -94,55 +94,6 @@ export class LocalStorageService implements StorageService {
     return videoFormats.includes(format.toLowerCase()) ? 'video' : 'image';
   }
 
-  async upload(file: File, guestName?: string, metadata?: UploadMetadata): Promise<UploadResult> {
-    const timestamp = Date.now();
-    const randomSuffix = Math.random().toString(36).substring(7);
-    const fileExtension = path.extname(file.name).slice(1).toLowerCase() || 'jpg';
-    const baseName = `${timestamp}-${randomSuffix}`;
-    const filename = `${baseName}.${fileExtension}`;
-
-    const sanitizedGuestName = guestName ? this.sanitizeGuestName(guestName) : 'unknown';
-    const relativeDir = sanitizedGuestName;
-    const relativePath = `${relativeDir}/${filename}`;
-    const absoluteDir = path.join(this.basePath, relativeDir);
-    const absolutePath = path.join(this.basePath, relativePath);
-
-    await this.ensureDir(absoluteDir);
-
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    await fs.writeFile(absolutePath, buffer);
-
-    let width = metadata?.width ?? 720;
-    let height = metadata?.height ?? 480;
-    let blurDataUrl = '';
-    if (file.type.startsWith('image/')) {
-      const result = await this.generateImageAssets(buffer, absoluteDir, baseName);
-      width = result.width;
-      height = result.height;
-      blurDataUrl = result.blurDataUrl;
-    }
-
-    const metaPath = this.getMetaPath(absoluteDir, baseName);
-    await this.ensureDir(path.dirname(metaPath));
-    await fs.writeFile(
-      metaPath,
-      JSON.stringify({ width, height, blurDataUrl, format: fileExtension }, null, 2)
-    );
-
-    const mediaUrl = this.getMediaUrl(relativePath);
-
-    return {
-      url: mediaUrl,
-      public_id: mediaUrl,
-      width,
-      height,
-      format: fileExtension,
-      resource_type: file.type.startsWith('video/') ? 'video' : 'image',
-      created_at: new Date().toISOString(),
-    };
-  }
-
   async uploadFromPath(
     source: UploadSource,
     guestName?: string,

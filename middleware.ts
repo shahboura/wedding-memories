@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { EVENT_TOKEN_COOKIE, isEventTokenRequired } from './utils/eventToken';
 
-const PUBLIC_PATHS = new Set(['/event', '/event/access', '/_next', '/favicon.ico']);
+const PUBLIC_PATHS = ['/event', '/event/access', '/_next', '/favicon.ico'];
 
 export function middleware(request: NextRequest): NextResponse {
   if (!isEventTokenRequired()) {
@@ -10,9 +10,7 @@ export function middleware(request: NextRequest): NextResponse {
 
   const { pathname } = request.nextUrl;
 
-  if (
-    Array.from(PUBLIC_PATHS).some((path) => pathname === path || pathname.startsWith(`${path}/`))
-  ) {
+  if (PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))) {
     return NextResponse.next();
   }
 

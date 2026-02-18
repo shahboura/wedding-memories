@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, forwardRef } from 'react';
+import { useState, useEffect, useRef, forwardRef } from 'react';
 import { Input } from './ui/input';
 import { validateGuestNameForUI } from '../utils/validation';
 
@@ -44,6 +44,10 @@ export const GuestNameInput = forwardRef<HTMLInputElement, GuestNameInputProps>(
     ref
   ) => {
     const [error, setError] = useState<string | null>(null);
+    const onValidationChangeRef = useRef(onValidationChange);
+    useEffect(() => {
+      onValidationChangeRef.current = onValidationChange;
+    });
 
     // Validate name whenever value changes
     useEffect(() => {
@@ -52,14 +56,14 @@ export const GuestNameInput = forwardRef<HTMLInputElement, GuestNameInputProps>(
       if (trimmedValue === '') {
         // Empty is not an error, but not valid either
         setError(null);
-        onValidationChange?.(false, null);
+        onValidationChangeRef.current?.(false, null);
         return;
       }
 
       const validationError = validateGuestNameForUI(trimmedValue, t || undefined);
       setError(validationError);
-      onValidationChange?.(!validationError, validationError);
-    }, [value, onValidationChange, t]);
+      onValidationChangeRef.current?.(!validationError, validationError);
+    }, [value, t]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       onChange(e.target.value);

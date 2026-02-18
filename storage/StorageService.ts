@@ -32,15 +32,6 @@ export interface UploadSource {
  */
 export interface StorageService {
   /**
-   * Uploads a file to storage.
-   *
-   * @param file - The file to upload
-   * @param guestName - Optional guest name for file organization
-   * @returns Promise that resolves to upload result with metadata
-   */
-  upload(file: File, guestName?: string, metadata?: UploadMetadata): Promise<UploadResult>;
-
-  /**
    * Uploads a local file (streamed) to storage.
    *
    * @param source - Local file reference and metadata

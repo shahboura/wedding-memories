@@ -94,13 +94,6 @@ class RateLimitStore {
       toRemove.forEach(([key]) => this.store.delete(key));
     }
   }
-
-  /**
-   * Gets store size for monitoring
-   */
-  getSize(): number {
-    return this.store.size;
-  }
 }
 
 // Global store instance (singleton pattern)
