@@ -559,21 +559,35 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
           }
         }
 
-        // No real progress events from fetch(); show 50% to indicate upload started
-        setFiles((prev) => prev.map((f) => (f.id === uploadFile.id ? { ...f, progress: 50 } : f)));
+        return new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', '/api/upload');
+          xhr.responseType = 'json';
 
-        const res = await fetch('/api/upload', {
-          method: 'POST',
-          body: formData,
+          xhr.upload.onprogress = (event) => {
+            if (!event.lengthComputable) {
+              return;
+            }
+            const progress = Math.min(99, Math.round((event.loaded / event.total) * 100));
+            setFiles((prev) => prev.map((f) => (f.id === uploadFile.id ? { ...f, progress } : f)));
+          };
+
+          xhr.onload = () => {
+            const responseData = xhr.response as { error?: string } | null;
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve(responseData);
+              return;
+            }
+
+            reject(new Error(responseData?.error || 'Failed to upload file'));
+          };
+
+          xhr.onerror = () => {
+            reject(new Error('Network error while uploading file'));
+          };
+
+          xhr.send(formData);
         });
-
-        const responseData = await res.json();
-
-        if (!res.ok) {
-          throw new Error(responseData.error || 'Failed to upload file');
-        }
-
-        return responseData;
       })();
 
       if (data) {

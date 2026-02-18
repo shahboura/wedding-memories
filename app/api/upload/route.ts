@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as fs from 'fs/promises';
+import { createWriteStream } from 'fs';
+import * as os from 'os';
 import * as path from 'path';
+import { randomUUID } from 'crypto';
+import { Readable } from 'stream';
+import type { ReadableStream as NodeWebReadableStream } from 'stream/web';
+import Busboy from 'busboy';
 import { storage } from '../../../storage';
 import { checkUploadRateLimit, createRateLimitHeaders } from '../../../utils/rateLimit';
 import {
@@ -72,10 +78,16 @@ function validateMagicBytes(buffer: Uint8Array): boolean {
  * @param file - The suspicious file
  * @param guestName - Guest who uploaded the file
  */
-async function quarantineFile(file: File, guestName: string): Promise<void> {
+async function quarantineFileFromPath(
+  tempFilePath: string,
+  originalName: string,
+  mimeType: string,
+  guestName: string,
+  size: number
+): Promise<void> {
   const timestamp = Date.now();
   const randomSuffix = Math.random().toString(36).substring(7);
-  const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const safeFileName = originalName.replace(/[^a-zA-Z0-9._-]/g, '_');
   const quarantineName = `${timestamp}-${randomSuffix}-${safeFileName}`;
 
   const basePath = process.env.LOCAL_STORAGE_PATH || '/app/uploads';
@@ -83,12 +95,16 @@ async function quarantineFile(file: File, guestName: string): Promise<void> {
   await fs.mkdir(quarantineDir, { recursive: true });
 
   const quarantinePath = path.join(quarantineDir, quarantineName);
-  const arrayBuffer = await file.arrayBuffer();
-  await fs.writeFile(quarantinePath, Buffer.from(arrayBuffer));
+  try {
+    await fs.rename(tempFilePath, quarantinePath);
+  } catch {
+    await fs.copyFile(tempFilePath, quarantinePath);
+    await fs.unlink(tempFilePath).catch(() => undefined);
+  }
 
   console.warn(
     `[QUARANTINE] Suspicious file from guest "${guestName}": ` +
-      `name="${file.name}", type="${file.type}", size=${file.size}, ` +
+      `name="${originalName}", type="${mimeType}", size=${size}, ` +
       `savedAs="${quarantineName}"`
   );
 }
@@ -99,33 +115,7 @@ async function quarantineFile(file: File, guestName: string): Promise<void> {
  * @param formData - Form data containing file and guest name
  * @throws {ValidationError} If validation fails
  */
-function validateUploadRequest(formData: FormData): { file: File; guestName: string } {
-  const file = formData.get('file') as File;
-  const guestName = formData.get('guestName') as string;
-
-  if (!file || !(file instanceof File)) {
-    throw new ValidationError('Valid file is required', 'file');
-  }
-
-  const isValidImage = file.type.startsWith('image/');
-  const isValidVideo = file.type.startsWith('video/');
-
-  // Both Cloudinary and S3 now support videos
-  if (!isValidImage && !isValidVideo) {
-    throw new ValidationError('File must be a valid image or video format', 'file');
-  }
-
-  // Server-side file size enforcement (mirrors client-side limits)
-  const maxSize = isValidVideo ? MAX_VIDEO_SIZE : MAX_IMAGE_SIZE;
-  if (file.size > maxSize) {
-    const sizeMB = Math.round(file.size / (1024 * 1024));
-    const maxSizeMB = Math.round(maxSize / (1024 * 1024));
-    throw new ValidationError(
-      `File size (${sizeMB}MB) exceeds maximum allowed size of ${maxSizeMB}MB`,
-      'file'
-    );
-  }
-
+function validateGuestNameValue(guestName: string | undefined): string {
   const trimmedGuestName = guestName?.trim() || '';
   if (!trimmedGuestName) {
     throw new ValidationError('Guest name is required', 'guestName');
@@ -135,7 +125,152 @@ function validateUploadRequest(formData: FormData): { file: File; guestName: str
     throw new ValidationError('Guest name must be less than 100 characters', 'guestName');
   }
 
-  return { file, guestName: trimmedGuestName };
+  return trimmedGuestName;
+}
+
+type UploadPayload = {
+  guestName: string;
+  tempFilePath: string;
+  originalFileName: string;
+  mimeType: string;
+  size: number;
+  width?: number;
+  height?: number;
+};
+
+async function parseMultipartRequest(request: NextRequest): Promise<UploadPayload> {
+  const contentType = request.headers.get('content-type');
+  if (!contentType?.includes('multipart/form-data')) {
+    throw new ValidationError('Invalid form data');
+  }
+
+  const tempDir = path.join(os.tmpdir(), 'wedding-memories');
+  await fs.mkdir(tempDir, { recursive: true });
+
+  return new Promise<UploadPayload>(async (resolve, reject) => {
+    const busboy = Busboy({ headers: { 'content-type': contentType } });
+    const fields = new Map<string, string>();
+    let filePath = '';
+    let fileSize = 0;
+    let fileMime = '';
+    let fileName = '';
+    let fileStream: ReturnType<typeof createWriteStream> | null = null;
+    let resolved = false;
+    let rejected = false;
+
+    const cleanup = async () => {
+      if (fileStream) {
+        fileStream.destroy();
+      }
+      if (filePath) {
+        try {
+          await fs.unlink(filePath);
+        } catch {
+          // ignore
+        }
+      }
+    };
+
+    busboy.on('field', (name: string, value: string) => {
+      fields.set(name, value);
+    });
+
+    busboy.on('file', (name: string, file: NodeJS.ReadableStream, info) => {
+      if (name !== 'file') {
+        file.resume();
+        return;
+      }
+
+      fileName = info.filename || 'upload';
+      fileMime = info.mimeType || '';
+
+      if (!fileMime.startsWith('image/') && !fileMime.startsWith('video/')) {
+        file.resume();
+        rejected = true;
+        reject(new ValidationError('File must be a valid image or video format', 'file'));
+        return;
+      }
+
+      const fileId = randomUUID();
+      filePath = path.join(tempDir, `${fileId}-${fileName}`);
+      fileStream = createWriteStream(filePath);
+
+      file.on('data', (chunk: Buffer) => {
+        fileSize += chunk.length;
+        const maxSize = fileMime.startsWith('video/') ? MAX_VIDEO_SIZE : MAX_IMAGE_SIZE;
+        if (fileSize > maxSize) {
+          file.unpipe(fileStream!);
+          fileStream?.destroy();
+          file.resume();
+          rejected = true;
+          reject(
+            new ValidationError(
+              `File size exceeds maximum allowed size of ${Math.round(maxSize / (1024 * 1024))}MB`,
+              'file'
+            )
+          );
+        }
+      });
+
+      file.on('error', (error: Error) => {
+        rejected = true;
+        reject(error);
+      });
+
+      fileStream.on('error', (error: Error) => {
+        rejected = true;
+        reject(error);
+      });
+
+      fileStream.on('close', () => {
+        if (resolved || rejected) return;
+        const guestName = validateGuestNameValue(fields.get('guestName'));
+        const widthValue = fields.get('width');
+        const heightValue = fields.get('height');
+        const width = widthValue ? Number(widthValue) : undefined;
+        const height = heightValue ? Number(heightValue) : undefined;
+
+        resolved = true;
+        resolve({
+          guestName,
+          tempFilePath: filePath,
+          originalFileName: fileName,
+          mimeType: fileMime,
+          size: fileSize,
+          width: Number.isFinite(width) ? width : undefined,
+          height: Number.isFinite(height) ? height : undefined,
+        });
+      });
+
+      file.pipe(fileStream);
+    });
+
+    busboy.on('error', async (error: Error) => {
+      await cleanup();
+      reject(error);
+    });
+
+    busboy.on('finish', async () => {
+      if (!filePath && !resolved) {
+        await cleanup();
+        reject(new ValidationError('Valid file is required', 'file'));
+      }
+    });
+
+    const body = request.body;
+    if (!body) {
+      reject(new ValidationError('Missing upload body'));
+      return;
+    }
+
+    try {
+      const nodeReadable = Readable.fromWeb(body as unknown as NodeWebReadableStream);
+      nodeReadable.pipe(busboy);
+    } catch (error) {
+      await cleanup();
+      reject(error);
+    }
+  });
 }
 
 /**
@@ -168,13 +303,9 @@ export async function POST(request: NextRequest): Promise<
       return NextResponse.json(errorResponse, { status: 401 });
     }
 
-    const formData = await request.formData().catch(() => {
-      throw new ValidationError('Invalid form data');
-    });
+    const uploadPayload = await parseMultipartRequest(request);
 
-    const { file, guestName } = validateUploadRequest(formData);
-
-    const rateLimitResult = checkUploadRateLimit(request, guestName);
+    const rateLimitResult = checkUploadRateLimit(request, uploadPayload.guestName);
     if (!rateLimitResult.success) {
       const errorResponse: ApiErrorResponse = {
         error: 'Too many uploads',
@@ -187,20 +318,26 @@ export async function POST(request: NextRequest): Promise<
       });
     }
 
-    const widthValue = formData.get('width');
-    const heightValue = formData.get('height');
-    const width = typeof widthValue === 'string' ? Number(widthValue) : undefined;
-    const height = typeof heightValue === 'string' ? Number(heightValue) : undefined;
     const metadata =
-      Number.isFinite(width) && Number.isFinite(height)
-        ? { width: width as number, height: height as number }
+      Number.isFinite(uploadPayload.width) && Number.isFinite(uploadPayload.height)
+        ? { width: uploadPayload.width as number, height: uploadPayload.height as number }
         : undefined;
 
     // Validate magic bytes — quarantine files whose actual content doesn't match
     // a known image/video signature (prevents spoofed MIME types)
-    const headerBytes = new Uint8Array(await file.slice(0, 16).arrayBuffer());
-    if (!validateMagicBytes(headerBytes)) {
-      await quarantineFile(file, guestName);
+    const headerStream = await fs.open(uploadPayload.tempFilePath, 'r');
+    const headerBuffer = Buffer.alloc(16);
+    await headerStream.read(headerBuffer, 0, 16, 0);
+    await headerStream.close();
+
+    if (!validateMagicBytes(headerBuffer)) {
+      await quarantineFileFromPath(
+        uploadPayload.tempFilePath,
+        uploadPayload.originalFileName,
+        uploadPayload.mimeType,
+        uploadPayload.guestName,
+        uploadPayload.size
+      );
       return NextResponse.json(
         {
           error: 'File is under review',
@@ -215,11 +352,22 @@ export async function POST(request: NextRequest): Promise<
       );
     }
 
-    const uploadResult = await storage.upload(file, guestName, metadata);
+    const uploadResult = await storage.uploadFromPath(
+      {
+        tempPath: uploadPayload.tempFilePath,
+        originalName: uploadPayload.originalFileName,
+        mimeType: uploadPayload.mimeType,
+        size: uploadPayload.size,
+      },
+      uploadPayload.guestName,
+      metadata
+    );
+
+    await fs.unlink(uploadPayload.tempFilePath).catch(() => undefined);
 
     const mediaData = {
       ...uploadResult,
-      guestName,
+      guestName: uploadPayload.guestName,
       uploadDate: uploadResult.created_at,
     };
 

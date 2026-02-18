@@ -18,6 +18,13 @@ export interface UploadMetadata {
   height?: number;
 }
 
+export interface UploadSource {
+  tempPath: string;
+  originalName: string;
+  mimeType: string;
+  size: number;
+}
+
 /**
  * Storage service interface for wedding photo management.
  *
@@ -33,6 +40,20 @@ export interface StorageService {
    * @returns Promise that resolves to upload result with metadata
    */
   upload(file: File, guestName?: string, metadata?: UploadMetadata): Promise<UploadResult>;
+
+  /**
+   * Uploads a local file (streamed) to the storage provider.
+   *
+   * @param source - Local file reference and metadata
+   * @param guestName - Optional guest name for file organization
+   * @param metadata - Optional media metadata (width/height)
+   * @returns Promise that resolves to upload result with metadata
+   */
+  uploadFromPath(
+    source: UploadSource,
+    guestName?: string,
+    metadata?: UploadMetadata
+  ): Promise<UploadResult>;
 
   /**
    * Lists all photos from the storage provider with metadata.
