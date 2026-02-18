@@ -146,6 +146,18 @@ export function StorageAwareMedia({
       setIsLoading(false);
     };
 
+    const handleWaiting = () => {
+      setIsLoading(true);
+    };
+
+    const handleStalled = () => {
+      setIsLoading(true);
+    };
+
+    const handlePlaying = () => {
+      setIsLoading(false);
+    };
+
     const handleError = () => {
       setLoadError(true);
       setIsLoading(false);
@@ -174,12 +186,18 @@ export function StorageAwareMedia({
     video.addEventListener('loadstart', handleLoadStart);
     video.addEventListener('loadedmetadata', handleLoadedMetadata);
     video.addEventListener('canplay', handleCanPlay);
+    video.addEventListener('waiting', handleWaiting);
+    video.addEventListener('stalled', handleStalled);
+    video.addEventListener('playing', handlePlaying);
     video.addEventListener('error', handleError);
 
     return () => {
       video.removeEventListener('loadstart', handleLoadStart);
       video.removeEventListener('loadedmetadata', handleLoadedMetadata);
       video.removeEventListener('canplay', handleCanPlay);
+      video.removeEventListener('waiting', handleWaiting);
+      video.removeEventListener('stalled', handleStalled);
+      video.removeEventListener('playing', handlePlaying);
       video.removeEventListener('error', handleError);
     };
   }, [resource_type, isGalleryView, context, src]);
@@ -212,7 +230,10 @@ export function StorageAwareMedia({
       <div
         ref={containerRef}
         className="relative group w-full h-full"
-        onClick={onClick}
+        onClick={() => {
+          handleVideoInteraction();
+          onClick?.();
+        }}
         onMouseEnter={() => {
           handleVideoInteraction();
           onMouseEnter?.();
@@ -226,6 +247,9 @@ export function StorageAwareMedia({
           if (isDesktop && context === 'gallery' && videoRef.current) {
             videoRef.current.pause();
           }
+        }}
+        onTouchStart={() => {
+          handleVideoInteraction();
         }}
         onFocus={handleVideoInteraction}
         tabIndex={tabIndex}
