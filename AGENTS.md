@@ -103,6 +103,18 @@ Summaries should be added to this AGENTS.md file under a "Session Summaries" sec
 
 ## Session Summaries
 
+### 2026-02-20 03:30 - Filmstrip: tap-only navigation, remove scroll-to-navigate
+
+**Agent:** orchestrator  
+**Summary:** Changed filmstrip from scroll-to-navigate to tap-only navigation, fixing retraction bug on fast scroll and simplifying the codebase.
+
+- Removed scroll listener (`findCenteredIndex`, `scrollend`/`scroll` handler) that synced `currentIndex` to filmstrip scroll position — scrolling the filmstrip no longer changes the main content
+- Removed `isProgrammaticScroll`, `isUserScrollChange`, `currentIndexRef`, `changeMediaIndexRef` refs and their sync effects — all existed solely for the scroll listener
+- Removed `scroll-snap-type: x mandatory` from container and `scrollSnapAlign: 'center'` from buttons — filmstrip is now free-scrolling with momentum
+- Removed `±5` content virtualization — all thumbnails render always (tiny gradient divs for video, small thumb images for photos; no layout reflow on fast scroll)
+- Kept: `scrollIntoView` centers active thumbnail on swipe/arrow/click navigation; `onClick` on thumbnails jumps to that item; free-scroll with momentum works naturally
+- Net -74 lines; `pnpm type-check` and `pnpm lint` both pass with zero errors/warnings
+
 ### 2026-02-20 03:00 - Fix swipe flicker and filmstrip click not navigating
 
 **Agent:** orchestrator  

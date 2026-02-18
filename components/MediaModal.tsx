@@ -54,17 +54,12 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
   const mediaContainerRef = useRef<HTMLDivElement>(null);
 
   // ── Filmstrip native scroll ──────────────────────────────────────────
+  // Tap-only navigation: scrolling the filmstrip just browses thumbnails,
+  // only tapping a thumbnail changes the main content.
   const filmstripRef = useRef<HTMLDivElement>(null);
   const filmstripHasScrolled = useRef(false);
-  // Suppress scroll-driven index updates during programmatic scrollIntoView
-  const isProgrammaticScroll = useRef(false);
-  // Map of index → button element for nearest-center lookup on user scroll
+  // Map of index → button element for scrollIntoView on navigation
   const thumbElements = useRef<Map<number, HTMLButtonElement>>(new Map());
-  // Keep a ref-mirror of currentIndex so scroll listeners never hold stale closures
-  const currentIndexRef = useRef(currentIndex);
-  useEffect(() => {
-    currentIndexRef.current = currentIndex;
-  }, [currentIndex]);
 
   // Stable ref callback — only maintains the element map, no scrolling logic.
   // This never changes identity so React never churns refs on re-render.
@@ -79,25 +74,19 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
     []
   );
 
-  // Scroll the active thumbnail into view when currentIndex changes.
-  // Separated from ref callback to avoid re-running for every button on each render.
+  // Scroll the active thumbnail into view when currentIndex changes
+  // (via swipe, arrow key, or thumbnail tap).
   useEffect(() => {
     const node = thumbElements.current.get(currentIndex);
     if (!node) return;
 
     const isFirstScroll = !filmstripHasScrolled.current;
-    isProgrammaticScroll.current = true;
     node.scrollIntoView({
       behavior: isFirstScroll ? 'instant' : 'smooth',
       inline: 'center',
       block: 'nearest',
     });
     filmstripHasScrolled.current = true;
-    const timeout = isFirstScroll ? 0 : 350;
-    const timer = setTimeout(() => {
-      isProgrammaticScroll.current = false;
-    }, timeout);
-    return () => clearTimeout(timer);
   }, [currentIndex]);
 
   // UI state
@@ -225,62 +214,6 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
     },
     [resetView]
   );
-  // Stable ref for changeMediaIndex so scroll listener doesn't re-register on every render
-  const changeMediaIndexRef = useRef(changeMediaIndex);
-  useEffect(() => {
-    changeMediaIndexRef.current = changeMediaIndex;
-  }, [changeMediaIndex]);
-
-  // Sync currentIndex when user manually scrolls the filmstrip to a new snap position.
-  // Uses refs for currentIndex and changeMediaIndex so the listener is registered once
-  // and never holds stale closures — no teardown/re-register on every index change.
-  useEffect(() => {
-    const container = filmstripRef.current;
-    if (!container) return;
-
-    const findCenteredIndex = () => {
-      if (isProgrammaticScroll.current) return;
-
-      const containerRect = container.getBoundingClientRect();
-      const centerX = containerRect.left + containerRect.width / 2;
-
-      let closestIndex = currentIndexRef.current;
-      let closestDistance = Infinity;
-
-      thumbElements.current.forEach((el, index) => {
-        const rect = el.getBoundingClientRect();
-        const elCenterX = rect.left + rect.width / 2;
-        const distance = Math.abs(elCenterX - centerX);
-        if (distance < closestDistance) {
-          closestDistance = distance;
-          closestIndex = index;
-        }
-      });
-
-      if (closestIndex !== currentIndexRef.current) {
-        changeMediaIndexRef.current(closestIndex);
-      }
-    };
-
-    // scrollend fires once after scroll + snap settles (Chrome 114+, FF 109+, Safari 18+).
-    // Debounced scroll fallback for older browsers.
-    let scrollTimer: ReturnType<typeof setTimeout>;
-    const useScrollend = 'onscrollend' in window;
-    const eventName = useScrollend ? 'scrollend' : 'scroll';
-
-    const handler = useScrollend
-      ? findCenteredIndex
-      : () => {
-          clearTimeout(scrollTimer);
-          scrollTimer = setTimeout(findCenteredIndex, 150);
-        };
-
-    container.addEventListener(eventName, handler, { passive: true });
-    return () => {
-      container.removeEventListener(eventName, handler);
-      clearTimeout(scrollTimer);
-    };
-  }, []); // stable — all mutable state accessed via refs
 
   // Prefetch adjacent media for faster switching
   // Uses <link rel="prefetch"> instead of hidden <video> elements to avoid
@@ -729,7 +662,6 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
                   className="mt-0 md:mt-6 flex items-center overflow-x-auto scrollbar-hide"
                   style={{
                     WebkitOverflowScrolling: 'touch',
-                    scrollSnapType: 'x mandatory',
                     scrollbarWidth: 'none',
                     msOverflowStyle: 'none',
                   }}
@@ -737,9 +669,6 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
                   {/* Leading spacer — centers first item */}
                   <div className="shrink-0" style={{ width: '50%' }} />
                   {items.map((item, index) => {
-                    // Only render real content within ±5 of current index; others
-                    // remain as empty placeholders preserving scroll width.
-                    const isNearby = Math.abs(index - currentIndex) <= 5;
                     const isVideoThumb = item.resource_type === 'video';
                     return (
                       <motion.button
@@ -749,29 +678,26 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
                         onClick={() => changeMediaIndex(index)}
                         key={index}
                         className={`${index === currentIndex ? 'z-20 rounded-md' : 'z-10'} ${index === 0 ? 'rounded-l-md' : ''} ${index === items.length - 1 ? 'rounded-r-md' : ''} relative inline-block w-16 md:w-20 h-16 md:h-20 shrink-0 transform-gpu overflow-hidden focus:outline-none`}
-                        style={{ scrollSnapAlign: 'center' }}
                       >
-                        {isNearby ? (
-                          isVideoThumb ? (
-                            <div
-                              className={`${index === currentIndex ? 'brightness-110' : 'brightness-50 contrast-125'} h-full w-full bg-gradient-to-br from-gray-700 to-gray-900 flex items-center justify-center transition`}
-                            >
-                              <Play
-                                className="text-white/70 w-4 h-4"
-                                fill="white"
-                                fillOpacity={0.5}
-                              />
-                            </div>
-                          ) : (
-                            <StorageAwareMedia
-                              {...getOptimizedMediaProps(item, 'thumb', {
-                                priority: Math.abs(index - currentIndex) <= 2,
-                                quality: 'thumb',
-                              })}
-                              className={`${index === currentIndex ? 'brightness-110 hover:brightness-110' : 'brightness-50 contrast-125 hover:brightness-75'} h-full transform object-cover transition`}
+                        {isVideoThumb ? (
+                          <div
+                            className={`${index === currentIndex ? 'brightness-110' : 'brightness-50 contrast-125'} h-full w-full bg-gradient-to-br from-gray-700 to-gray-900 flex items-center justify-center transition`}
+                          >
+                            <Play
+                              className="text-white/70 w-4 h-4"
+                              fill="white"
+                              fillOpacity={0.5}
                             />
-                          )
-                        ) : null}
+                          </div>
+                        ) : (
+                          <StorageAwareMedia
+                            {...getOptimizedMediaProps(item, 'thumb', {
+                              priority: Math.abs(index - currentIndex) <= 2,
+                              quality: 'thumb',
+                            })}
+                            className={`${index === currentIndex ? 'brightness-110 hover:brightness-110' : 'brightness-50 contrast-125 hover:brightness-75'} h-full transform object-cover transition`}
+                          />
+                        )}
                       </motion.button>
                     );
                   })}
