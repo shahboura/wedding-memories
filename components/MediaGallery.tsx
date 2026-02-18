@@ -110,13 +110,16 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
   }, []);
 
   const refetchWeddingMediaInternal = useCallback(
-    async (showLoading: boolean = true, currentGuestName?: string): Promise<number> => {
+    async (
+      options: { showLoading?: boolean; guestOverride?: string } = {}
+    ): Promise<MediaProps[]> => {
+      const { showLoading = true, guestOverride } = options;
       if (showLoading) {
         setIsLoading(true);
       }
       try {
         let url = '/api/photos';
-        const guestToUse = currentGuestName || guestName;
+        const guestToUse = guestOverride || guestName;
         if (appConfig.guestIsolation && guestToUse) {
           url += `?guest=${encodeURIComponent(guestToUse)}`;
         }
@@ -127,7 +130,7 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
           const refreshedMedia = await response.json();
           setMedia(refreshedMedia);
           refresh();
-          return refreshedMedia.length;
+          return refreshedMedia;
         } else {
           console.error('Failed to refetch media:', response.statusText);
         }
@@ -138,7 +141,7 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
           setIsLoading(false);
         }
       }
-      return 0;
+      return [];
     },
     [setMedia, setIsLoading, refresh, guestName]
   );
@@ -152,20 +155,10 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
 
     const fetchFresh = async () => {
       try {
-        let url = '/api/photos';
-        if (appConfig.guestIsolation && guestName) {
-          url += `?guest=${encodeURIComponent(guestName)}`;
-        }
-
-        const response = await fetch(url);
-        if (!response.ok) {
-          return;
-        }
-
-        const refreshedMedia = await response.json();
+        const refreshedMedia = await refetchWeddingMediaInternal({ showLoading: false });
         if (cancelled) return;
 
-        if (shouldReplaceMedia(mediaRef.current, refreshedMedia)) {
+        if (refreshedMedia.length > 0 && shouldReplaceMedia(mediaRef.current, refreshedMedia)) {
           setMedia(refreshedMedia);
           refresh();
         }
@@ -178,7 +171,7 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
     return () => {
       cancelled = true;
     };
-  }, [guestName, refresh, setMedia, shouldReplaceMedia]);
+  }, [guestName, refresh, setMedia, shouldReplaceMedia, refetchWeddingMediaInternal]);
 
   // Single fetch effect for guest isolation - only refetch if guest changes and we need isolation
   useEffect(() => {
@@ -186,7 +179,10 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
       const isNewGuest = previousGuestName.current !== guestName;
 
       if (isNewGuest) {
-        refetchWeddingMediaInternal(previousGuestName.current !== null, guestName);
+        refetchWeddingMediaInternal({
+          showLoading: previousGuestName.current !== null,
+          guestOverride: guestName,
+        });
         previousGuestName.current = guestName;
       }
     }

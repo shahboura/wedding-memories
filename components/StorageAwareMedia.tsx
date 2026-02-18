@@ -4,7 +4,7 @@
  * Uses direct img/video tags to avoid Next.js image optimization.
  */
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useI18n } from './I18nProvider';
 import type { MediaProps } from '../utils/types';
 import { Play, Video } from 'lucide-react';
@@ -78,6 +78,7 @@ export function StorageAwareMedia({
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const hasRequestedLoadRef = useRef(false);
   const [loadError, setLoadError] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [isDesktop, setIsDesktop] = useState(true);
@@ -92,19 +93,32 @@ export function StorageAwareMedia({
     setIsDesktop(desktop);
   }, []);
 
+  useEffect(() => {
+    hasRequestedLoadRef.current = false;
+  }, [src]);
+
+  const ensureVideoReady = useCallback((preloadMode: 'metadata' | 'auto') => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (video.preload !== preloadMode) {
+      video.preload = preloadMode;
+    }
+
+    if (!hasRequestedLoadRef.current || preloadMode === 'auto') {
+      video.load();
+      hasRequestedLoadRef.current = true;
+    }
+  }, []);
+
   // Intersection Observer: lazily upgrade preload when video scrolls into view.
   // This avoids downloading metadata for off-screen videos on mobile data.
   useEffect(() => {
     if (resource_type !== 'video' || context === 'modal') return;
 
     if (context === 'thumb') {
-      const video = videoRef.current;
-      if (!video) return;
       setHasFrame(false);
-      if (video.preload !== 'metadata') {
-        video.preload = 'metadata';
-      }
-      video.load();
+      ensureVideoReady('metadata');
       return;
     }
 
@@ -118,8 +132,7 @@ export function StorageAwareMedia({
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting && video.preload === 'none') {
-          video.preload = 'metadata';
-          video.load();
+          ensureVideoReady('metadata');
           observer.disconnect();
         }
       },
@@ -128,7 +141,7 @@ export function StorageAwareMedia({
 
     observer.observe(container);
     return () => observer.disconnect();
-  }, [resource_type, context, src]);
+  }, [resource_type, context, src, ensureVideoReady]);
 
   useEffect(() => {
     if (resource_type !== 'video') return;
@@ -216,24 +229,14 @@ export function StorageAwareMedia({
 
   const handlePlay = () => {
     const video = videoRef.current;
-    if (video) {
-      // Ensure video is ready for playback
-      if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
-        // Video needs more data - upgrade preload
-        video.preload = 'auto';
-        video.load(); // Force reload with auto preload
-      }
-      // Clear any loading states since user initiated play
-      setIsLoading(false);
+    if (video && video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+      ensureVideoReady('auto');
     }
+    setIsLoading(false);
   };
 
   const handleVideoInteraction = () => {
-    const video = videoRef.current;
-    if (video && video.preload === 'none') {
-      video.preload = 'metadata';
-      video.load();
-    }
+    ensureVideoReady('metadata');
   };
 
   if (resource_type === 'video') {
@@ -251,6 +254,7 @@ export function StorageAwareMedia({
           onMouseEnter?.();
           // Desktop hover play for gallery context
           if (isDesktop && context === 'gallery' && videoRef.current) {
+            ensureVideoReady('auto');
             videoRef.current.play().catch(() => {});
           }
         }}
@@ -306,8 +310,7 @@ export function StorageAwareMedia({
                 e.stopPropagation();
                 if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
                   // Prepare video for play
-                  video.preload = 'auto';
-                  video.load();
+                  ensureVideoReady('auto');
                   setIsLoading(true);
                   video.addEventListener(
                     'canplay',
