@@ -164,8 +164,8 @@ class SlidingWindowRateLimit {
  * per-minute burst cap would only frustrate legitimate users.
  */
 const uploadRateLimit = new SlidingWindowRateLimit({
-  windowMs: 10 * 60 * 1000, // 10 minutes
-  maxRequests: 60, // 60 uploads per 10 minutes (360/hour)
+  windowMs: 5 * 60 * 1000, // 5 minutes
+  maxRequests: 60, // 60 uploads per 5 minutes
   identifier: 'upload',
 });
 
@@ -217,6 +217,16 @@ function getRateLimitIdentifier(request: Request): string {
   return ipIdentifier;
 }
 
+function normalizeGuestName(guestName: string): string {
+  return guestName.trim().toLowerCase();
+}
+
+function getUploadRateLimitIdentifier(request: Request, guestName: string): string {
+  const baseIdentifier = getRateLimitIdentifier(request);
+  const normalizedGuest = normalizeGuestName(guestName);
+  return `${baseIdentifier}:guest=${normalizedGuest}`;
+}
+
 /**
  * Photos API rate limiting
  * Prevents scraping/abuse of the gallery listing endpoint
@@ -230,10 +240,13 @@ export function checkPhotosRateLimit(request: Request): RateLimitResult {
  * Enhanced upload rate limiting
  * Prevents sustained abuse while being generous for normal wedding use
  */
-export function checkUploadRateLimit(request: Request): RateLimitResult & {
+export function checkUploadRateLimit(
+  request: Request,
+  guestName: string
+): RateLimitResult & {
   message?: string;
 } {
-  const identifier = getRateLimitIdentifier(request);
+  const identifier = getUploadRateLimitIdentifier(request, guestName);
 
   const result = uploadRateLimit.check(identifier);
   if (!result.success) {

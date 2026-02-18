@@ -168,7 +168,13 @@ export async function POST(request: NextRequest): Promise<
       return NextResponse.json(errorResponse, { status: 401 });
     }
 
-    const rateLimitResult = checkUploadRateLimit(request);
+    const formData = await request.formData().catch(() => {
+      throw new ValidationError('Invalid form data');
+    });
+
+    const { file, guestName } = validateUploadRequest(formData);
+
+    const rateLimitResult = checkUploadRateLimit(request, guestName);
     if (!rateLimitResult.success) {
       const errorResponse: ApiErrorResponse = {
         error: 'Too many uploads',
@@ -181,13 +187,6 @@ export async function POST(request: NextRequest): Promise<
       });
     }
 
-    // Check content type to determine request format
-    // Handle uploads through Next.js server (FormData)
-    const formData = await request.formData().catch(() => {
-      throw new ValidationError('Invalid form data');
-    });
-
-    const { file, guestName } = validateUploadRequest(formData);
     const widthValue = formData.get('width');
     const heightValue = formData.get('height');
     const width = typeof widthValue === 'string' ? Number(widthValue) : undefined;
