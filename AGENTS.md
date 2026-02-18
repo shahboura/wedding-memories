@@ -103,6 +103,17 @@ Summaries should be added to this AGENTS.md file under a "Session Summaries" sec
 
 ## Session Summaries
 
+### 2026-02-20 01:30 - Fix modal filmstrip fetching all videos on open
+
+**Agent:** orchestrator  
+**Summary:** Replaced `<video>` elements in the modal filmstrip with static gradient+play placeholders to eliminate unnecessary video metadata fetches.
+
+- Root cause: filmstrip rendered `StorageAwareMedia` with `context="thumb"` for videos, which created actual `<video preload="metadata">` elements and called `video.load()` eagerly — up to 11 concurrent metadata fetches on modal open
+- Fix: video thumbnails now render a gradient+play icon `<div>` instead of `<video>` — zero network requests, identical navigation behavior
+- No impact on video playback — filmstrip thumbnails are purely navigational; the main content area loads the video independently when navigated to
+- At 64×80px, a video frame provides no meaningful visual info; the play icon is clearer UX
+- Verified: `pnpm type-check` and `pnpm lint` both pass with zero errors/warnings
+
 ### 2026-02-20 01:00 - Add /api/health endpoint for Docker healthcheck
 
 **Agent:** orchestrator  
