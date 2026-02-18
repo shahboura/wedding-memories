@@ -103,6 +103,70 @@ Summaries should be added to this AGENTS.md file under a "Session Summaries" sec
 
 ## Session Summaries
 
+### 2026-02-18 — Bug Fixes (Wrong Modal Item, Upload Placeholders, Video Thumbnails) & View Switcher Evaluation
+
+**Agent:** orchestrator
+
+**What was done:**
+
+- **fix(bcb1992): gallery opens wrong item after refetch, uploaded media shows placeholder**
+  - Root cause: per-file `addMedia()` inserted fake items with `Date.now()` IDs, empty `blurDataUrl`, and no video data — these showed as grey placeholders and shifted array positions causing modal to open wrong item
+  - Replaced with single `/api/photos` refetch after all uploads complete
+  - Changed modal selection from index-based to ID-based (`selectedMediaId` instead of `selectedMediaIndex`)
+  - Removed `addMedia` from Zustand store entirely
+  - Track upload success via return values instead of mutating inside React setState callback
+
+- **fix(c2eba87): video thumbnails show placeholder instead of black rectangle on mobile**
+  - Root cause: gallery videos used `preload="none"` on mobile → zero bytes downloaded → black rectangle. Desktop used `preload="auto"` → browser extracted first frame → worked
+  - Solution: Hybrid lazy-load approach (Option 4 — chosen over server-side ffmpeg posters, global `preload="metadata"`, and client-side canvas extraction)
+  - `preload="none"` on page load (zero bandwidth), Intersection Observer upgrades to `preload="metadata"` when video scrolls within 200px of viewport, `onLoadedMetadata` seeks to 0.1s, `onSeeked` sets `hasFrame=true` replacing placeholder with real first frame
+  - Styled gradient + play icon placeholder shown until first frame extracted (instead of black rectangle)
+  - `hasFrame` resets on `src` change to handle gallery refetch correctly
+
+- **decision: view switcher evaluated and rejected**
+  - Evaluated 3 views: masonry (current), grid (fixed square cells), list (thumbnail + text rows)
+  - Current CSS columns masonry layout is already optimal for mobile wedding guests: full-width single column on phones, preserves natural aspect ratios, no cropping
+  - Grid crops composition and wastes bandwidth on cropped pixels; list optimizes for 1000+ items (not needed for 50-200)
+  - With Local storage (no CDN transforms), all views serve the same full-resolution file — zero benefit from different view modes
+  - View switcher adds cognitive load for non-technical wedding guests who use the app once
+
+**Key decisions & instructions for future sessions:**
+
+- Use `NEXT_PUBLIC_` prefix for all client-visible env vars — baked at build time
+- **Turkish language has been REMOVED** — locale file deleted, enum value removed
+- **Keep `node:25-alpine`** in Dockerfile — intentional choice
+- **Sign commits with GPG** (`--gpg-sign`)
+- Primary audience: **mobile wedding guests on mobile data** — bandwidth matters for every feature decision
+- Storage provider is **Local** (`NEXT_PUBLIC_STORAGE_PROVIDER=local`) — self-hosted Docker with volume mount
+- Guest isolation defaults to **false** (shared gallery) — `=== 'true'` instead of `!== 'false'`
+- `sharp@^0.34.3` is in `package.json` but **NOT imported anywhere** in source (Next.js may use internally). Available for image processing without adding dependency
+- **No ffmpeg** in project — would need to be added for server-side video poster generation
+- `LocalStorageService` hardcodes `width: 720, height: 480` for all media — no actual dimension extraction
+- `viewport-fit: 'cover'` is set in `layout.tsx`, making all `env(safe-area-inset-*)` values functional
+
+**Architecture notes:**
+
+- Next.js 16, React 19, Tailwind CSS v4, Zustand, Framer Motion, Radix UI
+- Storage abstracted via `StorageService` interface — Cloudinary, S3/Wasabi, Local
+- i18n via i18next + react-i18next (English, Malay)
+- Docker multi-stage build, standalone output
+- Guest name stored in `localStorage` via Zustand persist — zero cookies, zero server sessions
+- Modal selection is ID-based (`selectedMediaId: number | string | null` in store)
+
+**Open items (not urgent):**
+
+- I2: Change `selectedMediaId: number | string | null` → `number | null` (dead `string` branch since `addMedia` removed)
+- P6: S3/Local images served at full resolution (needs sharp pipeline)
+- P8: No pagination on media list API
+- H2: Download URL not validated against `javascript:` scheme in MediaModal
+- O3: Duplicate `/api/photos` URL construction in Upload.tsx and MediaGallery.tsx
+- O5: No AbortController on gallery refetch in handleUploadAll
+- `LocalStorageService` hardcodes dimensions — no actual video/image probing
+
+**Verification:** `pnpm type-check` and `pnpm lint` both pass with zero errors/warnings.
+
+---
+
 ### 2026-02-16 — Docker Runtime Fix, Local Storage Support & Dead Code Cleanup
 
 **Agent:** orchestrator
