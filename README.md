@@ -76,6 +76,8 @@ A modern, accessible wedding memories gallery supporting **both photos and video
 https://your-domain.com/event?token=YOUR_EVENT_TOKEN
 ```
 
+- This is the only supported token flow (QR link sets HttpOnly cookie → gallery access).
+
 **App Configuration (config.ts)**
 
 ```typescript

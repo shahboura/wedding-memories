@@ -103,6 +103,25 @@ Summaries should be added to this AGENTS.md file under a "Session Summaries" sec
 
 ## Session Summaries
 
+### 2026-02-19 21:10 - Cleanup pass and token flow clarification
+
+**Agent:** orchestrator  
+**Summary:** Cleaned up docs and storage references; clarified token flow and enforced access page.
+
+- Updated README with single QR token flow note
+- Cleaned CONTRIBUTING.md storage references (local-only)
+- Updated StorageService docs to local-first
+- Handoff to: codebase for final testing
+
+### 2026-02-19 20:30 - AGENTS.md summary check
+
+**Agent:** review  
+**Summary:** Reviewed AGENTS.md for latest entries and guidance.
+
+- Confirmed newest entry is 2026-02-19 20:10 (event token middleware guard)
+- No newer summaries found in file
+- Recommendation: add a new summary if post-20:10 changes exist
+
 ### 2026-02-19 20:10 - Event token middleware guard
 
 **Agent:** planner  

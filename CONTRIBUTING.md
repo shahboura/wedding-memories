@@ -15,7 +15,7 @@ Thank you for your interest in contributing to the Wedding Memories Gallery! Thi
 
 - Node.js 18+
 - pnpm package manager
-- Storage account for testing (Cloudinary or S3/Wasabi)
+- Local storage volume for uploads (no cloud credentials)
 
 ### Development Setup
 
@@ -36,8 +36,7 @@ Thank you for your interest in contributing to the Wedding Memories Gallery! Thi
 
    ```bash
    cp .env.example .env
-   # Edit .env with your storage provider credentials (Cloudinary or S3/Wasabi)
-   # Configure storage provider in config.ts
+    # Edit .env with your local configuration
    ```
 
 4. **Start Development Server**
@@ -60,8 +59,8 @@ Thank you for your interest in contributing to the Wedding Memories Gallery! Thi
 
 - **Functions**: `uploadPhotos()`, `validateImageFile()`
 - **Variables**: `photoMetadata`, `isUploadComplete`, `galleryState`
-- **Constants**: `MAX_FILE_SIZE`, `CLOUDINARY_FOLDER`, `IMAGE_QUALITY`
-- **Components**: `PhotoGallery`, `CachedModal`, `WelcomeDialog`
+- **Constants**: `MAX_FILE_SIZE`, `IMAGE_QUALITY`
+- **Components**: `MediaGallery`, `MediaModal`, `GuestNameForm`
 - **Files**: `photo-gallery.tsx`, `useAppStore.ts`, `cloudinary.ts`
 
 ### Function Guidelines
@@ -246,12 +245,12 @@ Any other context or screenshots about the feature request.
 - **Metadata Preservation**: Keep guest names and upload timestamps
 - **Progressive Loading**: Show blur placeholders before high-quality images
 
-### Cloudinary Integration
+### Local Storage Integration
 
-- Images stored in configured folder with proper organization
-- Automatic optimization and responsive sizing
+- Images stored on the local filesystem with per-guest folders
+- Automatic optimization and responsive sizing via Sharp
 - Blur placeholder generation for smooth loading
-- Upload API handles base64 file conversion securely
+- Upload API handles streaming multipart uploads securely
 
 ## Performance Guidelines
 

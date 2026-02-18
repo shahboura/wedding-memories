@@ -28,8 +28,8 @@ export interface UploadSource {
 /**
  * Storage service interface for wedding photo management.
  *
- * Provides a unified interface for different storage providers
- * (Cloudinary, S3/Wasabi) to handle photo uploads and listing.
+ * Provides a unified interface for storage providers
+ * (local filesystem by default).
  */
 export interface StorageService {
   /**
