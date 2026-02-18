@@ -103,6 +103,19 @@ Summaries should be added to this AGENTS.md file under a "Session Summaries" sec
 
 ## Session Summaries
 
+### 2026-02-20 02:00 - Rewrite filmstrip to native scroll with scroll-snap
+
+**Agent:** orchestrator  
+**Summary:** Replaced Framer Motion `animate.x` transform filmstrip with native `overflow-x: auto` scroll + CSS `scroll-snap-type: x mandatory` for fast random-access navigation.
+
+- Replaced `<motion.div animate={{ x }}>` with native scrollable `<div>` — enables momentum scrolling, touch drag, and random access on mobile
+- Active thumbnail centered via `scrollIntoView({ inline: 'center' })` using a `RefCallback` keyed on `currentIndex`; first scroll on modal open uses `behavior: 'instant'`, subsequent navigations use `'smooth'`
+- Added 50%-width leading/trailing spacers so first and last items can be centered
+- Fixed desktop centering bug: old code hardcoded `64px` per item but thumbnails are `w-16 md:w-20` (64px mobile, 80px desktop), causing progressive mis-centering on desktop
+- Added `scrollbar-hide` CSS utility (WebKit pseudo-element) to `styles/index.css`; Firefox/IE handled via inline `scrollbarWidth: 'none'` / `msOverflowStyle: 'none'`
+- Kept `<motion.button>` scale animation on active thumbnail and ±5 content virtualization (empty buttons preserve scroll width)
+- Verified: `pnpm type-check` and `pnpm lint` both pass with zero errors/warnings
+
 ### 2026-02-20 01:30 - Fix modal filmstrip fetching all videos on open
 
 **Agent:** orchestrator  
