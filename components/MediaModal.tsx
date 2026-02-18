@@ -27,6 +27,7 @@ import {
   ZoomIn,
   ZoomOut,
   RotateCcw,
+  Play,
 } from 'lucide-react';
 import type { MediaProps } from '../utils/types';
 import { getOptimizedMediaProps, prefetchMediaOnInteraction } from '../utils/mediaOptimization';
@@ -663,6 +664,7 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
                             />
                           );
                         }
+                        const isVideoThumb = item.resource_type === 'video';
                         return (
                           <motion.button
                             animate={{ scale: index === currentIndex ? 1.15 : 1 }}
@@ -671,13 +673,25 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
                             key={index}
                             className={`${index === currentIndex ? 'z-20 rounded-md' : 'z-10'} ${index === 0 ? 'rounded-l-md' : ''} ${index === items.length - 1 ? 'rounded-r-md' : ''} relative inline-block w-16 md:w-20 h-16 md:h-20 shrink-0 transform-gpu overflow-hidden focus:outline-none`}
                           >
-                            <StorageAwareMedia
-                              {...getOptimizedMediaProps(item, 'thumb', {
-                                priority: Math.abs(index - currentIndex) <= 2,
-                                quality: 'thumb',
-                              })}
-                              className={`${index === currentIndex ? 'brightness-110 hover:brightness-110' : 'brightness-50 contrast-125 hover:brightness-75'} h-full transform object-cover transition`}
-                            />
+                            {isVideoThumb ? (
+                              <div
+                                className={`${index === currentIndex ? 'brightness-110' : 'brightness-50 contrast-125'} h-full w-full bg-gradient-to-br from-gray-700 to-gray-900 flex items-center justify-center transition`}
+                              >
+                                <Play
+                                  className="text-white/70 w-4 h-4"
+                                  fill="white"
+                                  fillOpacity={0.5}
+                                />
+                              </div>
+                            ) : (
+                              <StorageAwareMedia
+                                {...getOptimizedMediaProps(item, 'thumb', {
+                                  priority: Math.abs(index - currentIndex) <= 2,
+                                  quality: 'thumb',
+                                })}
+                                className={`${index === currentIndex ? 'brightness-110 hover:brightness-110' : 'brightness-50 contrast-125 hover:brightness-75'} h-full transform object-cover transition`}
+                              />
+                            )}
                           </motion.button>
                         );
                       })}
