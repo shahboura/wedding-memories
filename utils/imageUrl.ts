@@ -15,9 +15,9 @@ class MediaUrlService {
    */
   static getMediaUrl(
     publicId: string,
-    resourceType: 'image' | 'video',
-    width?: number,
-    height?: number,
+    _resourceType: 'image' | 'video',
+    _width?: number,
+    _height?: number,
     _quality: 'auto' | 'low' | 'medium' | 'high' = 'auto'
   ): string {
     return publicId;
