@@ -61,6 +61,7 @@ import {
 
 import type { UploadFile } from '../utils/types';
 import { formatFileSize, getCompressionInfo } from '../utils/clientUtils';
+import { getVideoMetadata, uploadWithXHR } from '../utils/uploadClient';
 import { useI18n } from './I18nProvider';
 import { useSearchParams } from 'next/navigation';
 
@@ -523,70 +524,13 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
         formData.append('guestName', guestName);
 
         if (uploadFile.file.type.startsWith('video/')) {
-          const video = document.createElement('video');
-          const objectUrl = URL.createObjectURL(uploadFile.file);
-
-          try {
-            const metadata = await new Promise<{ width: number; height: number }>((resolve) => {
-              let settled = false;
-              const timeoutId = window.setTimeout(() => {
-                if (!settled) {
-                  settled = true;
-                  resolve({ width: 720, height: 480 });
-                }
-              }, 4000);
-
-              video.preload = 'metadata';
-              video.onloadedmetadata = () => {
-                if (settled) return;
-                settled = true;
-                window.clearTimeout(timeoutId);
-                resolve({ width: video.videoWidth || 720, height: video.videoHeight || 480 });
-              };
-              video.onerror = () => {
-                if (settled) return;
-                settled = true;
-                window.clearTimeout(timeoutId);
-                resolve({ width: 720, height: 480 });
-              };
-              video.src = objectUrl;
-            });
-
-            formData.append('width', String(metadata.width));
-            formData.append('height', String(metadata.height));
-          } finally {
-            URL.revokeObjectURL(objectUrl);
-          }
+          const metadata = await getVideoMetadata(uploadFile.file);
+          formData.append('width', String(metadata.width));
+          formData.append('height', String(metadata.height));
         }
 
-        return new Promise((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-          xhr.open('POST', '/api/upload');
-          xhr.responseType = 'json';
-
-          xhr.upload.onprogress = (event) => {
-            if (!event.lengthComputable) {
-              return;
-            }
-            const progress = Math.min(99, Math.round((event.loaded / event.total) * 100));
-            setFiles((prev) => prev.map((f) => (f.id === uploadFile.id ? { ...f, progress } : f)));
-          };
-
-          xhr.onload = () => {
-            const responseData = xhr.response as { error?: string } | null;
-            if (xhr.status >= 200 && xhr.status < 300) {
-              resolve(responseData);
-              return;
-            }
-
-            reject(new Error(responseData?.error || 'Failed to upload file'));
-          };
-
-          xhr.onerror = () => {
-            reject(new Error('Network error while uploading file'));
-          };
-
-          xhr.send(formData);
+        return uploadWithXHR(formData, (progress) => {
+          setFiles((prev) => prev.map((f) => (f.id === uploadFile.id ? { ...f, progress } : f)));
         });
       })();
 
