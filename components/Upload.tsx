@@ -662,6 +662,7 @@ export const Upload = ({ currentGuestName }: UploadProps) => {
         }
         const eventToken = getEventToken();
         const response = await fetch(url, {
+          cache: 'no-store',
           headers: eventToken ? { 'x-event-token': eventToken } : undefined,
         });
         if (response.ok) {
