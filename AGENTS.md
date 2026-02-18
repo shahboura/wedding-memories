@@ -103,6 +103,15 @@ Summaries should be added to this AGENTS.md file under a "Session Summaries" sec
 
 ## Session Summaries
 
+### 2026-02-19 21:45 - Compose passes EVENT_TOKEN
+
+**Agent:** orchestrator  
+**Summary:** Passed EVENT_TOKEN into docker compose environments.
+
+- Added EVENT_TOKEN to docker-compose.yml runtime env
+- Added EVENT_TOKEN to docker-compose.dev.yml env
+- Enables token gating in Docker without rebuild
+
 ### 2026-02-19 21:10 - Cleanup pass and token flow clarification
 
 **Agent:** orchestrator  
