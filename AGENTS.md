@@ -103,6 +103,17 @@ Summaries should be added to this AGENTS.md file under a "Session Summaries" sec
 
 ## Session Summaries
 
+### 2026-02-20 00:15 - Fix Firefox video seek DOMException and flicker
+
+**Agent:** orchestrator  
+**Summary:** Fixed Firefox DOMException ("fetching process aborted by the user agent") caused by seeking to an unbuffered video position in the `onLoadedMetadata` handler.
+
+- Root cause: `currentTime = 0.1` in `onLoadedMetadata` seeks blindly; Firefox with `preload="metadata"` buffers zero video frames, so the seek aborts the in-progress fetch
+- Fix: guard seek with `video.buffered.length > 0 && video.buffered.end(0) >= 0.1` — Chrome/Safari still extract first frame; Firefox keeps the gradient+play placeholder
+- Also committed: `hasEverHadDataRef` to prevent skeleton flicker during mid-playback buffering, preload rank logic to avoid redundant `video.load()` on Edge/Firefox, removed redundant `onTouchStart` handler
+- Evaluated server-side poster via ffmpeg as alternative — deferred (30-50MB Docker bloat, not justified for this fix)
+- Verified: `pnpm type-check` and `pnpm lint` both pass with zero errors/warnings
+
 ### 2026-02-19 23:30 - Dead code cleanup and blur pipeline connection
 
 **Agent:** orchestrator  
