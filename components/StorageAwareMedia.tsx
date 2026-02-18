@@ -76,6 +76,10 @@ export function StorageAwareMedia({
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hasRequestedLoadRef = useRef(false);
+  // Tracks whether the video has ever decoded frame data. Once true, we never
+  // show the pulsing skeleton again — the browser keeps the last decoded frame
+  // visible during seeks/buffering, so our overlay would just cause flicker.
+  const hasEverHadDataRef = useRef(false);
   const [loadError, setLoadError] = useState(false);
   const [isMobile] = useState(isMobileDevice);
   const isDesktop = !isMobile;
@@ -91,17 +95,26 @@ export function StorageAwareMedia({
 
   useEffect(() => {
     hasRequestedLoadRef.current = false;
+    hasEverHadDataRef.current = false;
   }, [src]);
 
   const ensureVideoReady = useCallback((preloadMode: 'metadata' | 'auto') => {
     const video = videoRef.current;
     if (!video) return;
 
-    if (video.preload !== preloadMode) {
+    // Rank preload levels so we only call load() when upgrading, never when
+    // already at or above the requested level.  Calling video.load() restarts
+    // the entire resource fetch (WHATWG spec) — redundant calls cause duplicate
+    // network requests and flicker on Edge / Firefox.
+    const PRELOAD_RANK: Record<string, number> = { none: 0, metadata: 1, auto: 2 };
+    const currentRank = PRELOAD_RANK[video.preload] ?? 0;
+    const requestedRank = PRELOAD_RANK[preloadMode];
+
+    if (currentRank < requestedRank) {
       video.preload = preloadMode;
     }
 
-    if (!hasRequestedLoadRef.current || preloadMode === 'auto') {
+    if (!hasRequestedLoadRef.current || currentRank < requestedRank) {
       video.load();
       hasRequestedLoadRef.current = true;
     }
@@ -149,10 +162,11 @@ export function StorageAwareMedia({
     setLoadError(false);
 
     // Check if video is already loaded before setting loading state
-    if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
-      setIsLoading(true);
-    } else {
+    if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+      hasEverHadDataRef.current = true;
       setIsLoading(false);
+    } else if (!hasEverHadDataRef.current) {
+      setIsLoading(true);
     }
 
     const handleLoadedMetadata = () => {
@@ -164,18 +178,27 @@ export function StorageAwareMedia({
 
     const handleCanPlay = () => {
       // Video is ready to play
+      hasEverHadDataRef.current = true;
       setIsLoading(false);
     };
 
     const handleWaiting = () => {
-      setIsLoading(true);
+      // Only show skeleton during initial load, not mid-playback buffering.
+      // Browsers keep the last decoded frame visible during seeks, so our
+      // pulsing overlay would just cause flicker (especially on Firefox).
+      if (!hasEverHadDataRef.current) {
+        setIsLoading(true);
+      }
     };
 
     const handleStalled = () => {
-      setIsLoading(true);
+      if (!hasEverHadDataRef.current) {
+        setIsLoading(true);
+      }
     };
 
     const handlePlaying = () => {
+      hasEverHadDataRef.current = true;
       setIsLoading(false);
     };
 
@@ -193,13 +216,18 @@ export function StorageAwareMedia({
     }
 
     if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+      hasEverHadDataRef.current = true;
       setIsLoading(false);
       return;
     }
 
     const handleLoadStart = () => {
-      // Video has started loading
-      setIsLoading(true);
+      // Only show skeleton during initial load — not when re-loading a video
+      // that has already rendered frames (e.g., preload upgrade from metadata
+      // to auto during playback).
+      if (!hasEverHadDataRef.current) {
+        setIsLoading(true);
+      }
       setLoadError(false);
     };
 
@@ -259,9 +287,6 @@ export function StorageAwareMedia({
           if (isDesktop && context === 'gallery' && videoRef.current) {
             videoRef.current.pause();
           }
-        }}
-        onTouchStart={() => {
-          handleVideoInteraction();
         }}
         onFocus={handleVideoInteraction}
         tabIndex={tabIndex}
@@ -353,9 +378,16 @@ export function StorageAwareMedia({
           disablePictureInPicture={isMobile}
           onLoadedMetadata={() => {
             // Force show first frame so the browser renders a visible poster
-            // instead of a black rectangle (not all browsers do this automatically)
-            if (context !== 'modal' && videoRef.current && videoRef.current.currentTime === 0) {
-              videoRef.current.currentTime = 0.1;
+            // instead of a black rectangle (not all browsers do this automatically).
+            // Guard: only seek if the browser has actually buffered data at 0.1s.
+            // Firefox with preload="metadata" often buffers zero video frames,
+            // so seeking to an unbuffered position aborts the in-progress fetch
+            // and throws DOMException ("fetching process…aborted by the user agent").
+            const video = videoRef.current;
+            if (context !== 'modal' && video && video.currentTime === 0) {
+              if (video.buffered.length > 0 && video.buffered.end(0) >= 0.1) {
+                video.currentTime = 0.1;
+              }
             }
           }}
           onSeeked={() => {
