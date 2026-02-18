@@ -1,12 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
 export function EventAccessForm() {
-  const router = useRouter();
   const [token, setToken] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -22,24 +20,7 @@ export function EventAccessForm() {
     setIsSubmitting(true);
     setError(null);
 
-    try {
-      const response = await fetch(`/event?token=${encodeURIComponent(trimmed)}`, {
-        method: 'GET',
-        redirect: 'follow',
-      });
-
-      if (!response.ok) {
-        setError('Invalid token. Please check the code and try again.');
-        return;
-      }
-
-      router.replace('/');
-      router.refresh();
-    } catch {
-      setError('Unable to verify token. Please try again.');
-    } finally {
-      setIsSubmitting(false);
-    }
+    window.location.assign(`/event?token=${encodeURIComponent(trimmed)}`);
   };
 
   return (
