@@ -72,6 +72,7 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
   const [controlsVisible, setControlsVisible] = useState(true);
   const [lastTapTime, setLastTapTime] = useState(0);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
 
   // Touch tracking for distinguishing taps from swipes
   const [touchStartPos, setTouchStartPos] = useState({ x: 0, y: 0 });
@@ -228,6 +229,39 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
 
   const currentItem = items[currentIndex];
   const isVideo = currentItem?.resource_type === 'video';
+
+  // Track video playback state to disable swipe navigation during playback
+  useEffect(() => {
+    if (!isOpen || !isVideo) {
+      setIsVideoPlaying(false);
+      return;
+    }
+
+    const container = mediaContainerRef.current;
+    if (!container) return;
+
+    const video = container.querySelector('video');
+    if (!video) {
+      setIsVideoPlaying(false);
+      return;
+    }
+
+    const handlePlay = () => setIsVideoPlaying(true);
+    const handlePause = () => setIsVideoPlaying(false);
+    const handleEnded = () => setIsVideoPlaying(false);
+
+    video.addEventListener('play', handlePlay);
+    video.addEventListener('pause', handlePause);
+    video.addEventListener('ended', handleEnded);
+
+    setIsVideoPlaying(!video.paused && !video.ended);
+
+    return () => {
+      video.removeEventListener('play', handlePlay);
+      video.removeEventListener('pause', handlePause);
+      video.removeEventListener('ended', handleEnded);
+    };
+  }, [isOpen, isVideo, currentIndex]);
 
   // Memoize media props to prevent unnecessary re-fetches
   const currentMediaProps = useMemo(() => {
@@ -400,15 +434,19 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
   // Swipe handlers (only when not zoomed to avoid conflicts)
   const handlers = useSwipeable({
     onSwipedLeft: () => {
-      if (zoom === 1 && !isPinching && currentIndex < items.length - 1) {
+      if (zoom === 1 && !isPinching && !isVideoPlaying && currentIndex < items.length - 1) {
         changeMediaIndex(currentIndex + 1);
       }
     },
     onSwipedRight: () => {
-      if (zoom === 1 && !isPinching && currentIndex > 0) {
+      if (zoom === 1 && !isPinching && !isVideoPlaying && currentIndex > 0) {
         changeMediaIndex(currentIndex - 1);
       }
     },
+    delta: 50,
+    swipeDuration: 300,
+    preventScrollOnSwipe: true,
+    trackTouch: true,
     trackMouse: true,
   });
 
@@ -436,7 +474,7 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
           >
             <div
               className="relative z-50 flex w-full max-w-7xl items-center justify-center p-4"
-              {...(zoom === 1 && !isPinching ? handlers : {})}
+              {...(zoom === 1 && !isPinching && !isVideoPlaying ? handlers : {})}
             >
               <div className="w-full h-full flex items-center justify-center">
                 <div
