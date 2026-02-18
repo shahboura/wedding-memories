@@ -103,6 +103,16 @@ Summaries should be added to this AGENTS.md file under a "Session Summaries" sec
 
 ## Session Summaries
 
+### 2026-02-19 20:10 - Event token middleware guard
+
+**Agent:** planner  
+**Summary:** Enforced event-token access across pages via middleware and added access page.
+
+- Added middleware to require EVENT_TOKEN cookie for all non-API routes
+- Added /event/access page for unauthorized visitors
+- Redirects unauthenticated users to /event/access
+- Handoff to: codebase for final testing
+
 ### 2026-02-19 19:10 - Event token QR route + streaming upload refactor
 
 **Agent:** planner  
