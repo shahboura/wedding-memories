@@ -70,6 +70,7 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
   const guestName = useGuestName();
   const hasHydrated = useHasHydrated();
   const previousGuestName = useRef<string | null>(null);
+  const mediaRef = useRef<MediaProps[]>(media);
   const { t, language } = useI18n();
 
   // Resolve the selected media index from the stored ID.
@@ -85,6 +86,28 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
       setMedia(initialMedia);
     }
   }, [initialMedia, media.length, setMedia]);
+
+  useEffect(() => {
+    mediaRef.current = media;
+  }, [media]);
+
+  const shouldReplaceMedia = useCallback((currentItems: MediaProps[], nextItems: MediaProps[]) => {
+    if (nextItems.length === 0) {
+      return currentItems.length === 0;
+    }
+    const getLatestTimestamp = (items: MediaProps[]): number => {
+      return items.reduce((latest, item) => {
+        if (!item.uploadDate) return latest;
+        const timestamp = new Date(item.uploadDate).getTime();
+        return Number.isFinite(timestamp) ? Math.max(latest, timestamp) : latest;
+      }, 0);
+    };
+
+    const currentLatest = getLatestTimestamp(currentItems);
+    const nextLatest = getLatestTimestamp(nextItems);
+    if (nextLatest > currentLatest) return true;
+    return nextLatest === currentLatest && nextItems.length !== currentItems.length;
+  }, []);
 
   const refetchWeddingMediaInternal = useCallback(
     async (showLoading: boolean = true, currentGuestName?: string): Promise<number> => {
@@ -119,6 +142,43 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
     },
     [setMedia, setIsLoading, refresh, guestName]
   );
+
+  useEffect(() => {
+    if (appConfig.guestIsolation && !guestName) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchFresh = async () => {
+      try {
+        let url = '/api/photos';
+        if (appConfig.guestIsolation && guestName) {
+          url += `?guest=${encodeURIComponent(guestName)}`;
+        }
+
+        const response = await fetch(url);
+        if (!response.ok) {
+          return;
+        }
+
+        const refreshedMedia = await response.json();
+        if (cancelled) return;
+
+        if (shouldReplaceMedia(mediaRef.current, refreshedMedia)) {
+          setMedia(refreshedMedia);
+          refresh();
+        }
+      } catch (error) {
+        console.error('Failed to refresh gallery media:', error);
+      }
+    };
+
+    fetchFresh();
+    return () => {
+      cancelled = true;
+    };
+  }, [guestName, refresh, setMedia, shouldReplaceMedia]);
 
   // Single fetch effect for guest isolation - only refetch if guest changes and we need isolation
   useEffect(() => {
