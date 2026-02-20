@@ -193,6 +193,12 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
     });
   }, []);
 
+  useEffect(() => {
+    if (!isOpen) {
+      pauseModalVideos();
+    }
+  }, [isOpen, pauseModalVideos]);
+
   const changeMediaIndex = useCallback(
     (newIndex: number) => {
       // Pause any currently playing video within the modal only
@@ -549,7 +555,10 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
     >
       <DialogPortal>
         <DialogOverlay className="fixed inset-0 z-50 bg-black/70 backdrop-blur-2xl" />
-        <DialogPrimitive.Content className="fixed inset-0 z-50 flex items-center justify-center w-screen h-screen-dynamic p-0 border-0 bg-transparent shadow-none">
+        <DialogPrimitive.Content
+          className="fixed inset-0 z-50 flex items-center justify-center w-screen h-screen-dynamic p-0 border-0 bg-transparent shadow-none"
+          onCloseAutoFocus={(event) => event.preventDefault()}
+        >
           <DialogTitle className="sr-only">
             Wedding media {currentIndex + 1} of {items.length}
             {currentItem.guestName && ` shared by ${currentItem.guestName}`}

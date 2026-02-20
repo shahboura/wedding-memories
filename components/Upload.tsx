@@ -1215,7 +1215,10 @@ export const Upload = () => {
         <DrawerTrigger asChild>
           <TriggerButton label={t('upload.addFiles')} />
         </DrawerTrigger>
-        <DrawerContent className="max-h-[90dvh] h-[90dvh] flex flex-col">
+        <DrawerContent
+          className="max-h-[90dvh] h-[90dvh] flex flex-col"
+          onCloseAutoFocus={(event) => event.preventDefault()}
+        >
           <DrawerHeader className="flex-shrink-0 border-b bg-background/95 backdrop-blur">
             <div className="space-y-2">
               <DrawerTitle>{t('upload.title')}</DrawerTitle>
