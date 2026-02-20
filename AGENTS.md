@@ -103,6 +103,13 @@ Summaries should be added to this AGENTS.md file under a "Session Summaries" sec
 
 ## Session Summaries
 
+### 2026-02-21 10:45 - Remove AppLoader and cleanup dead exports
+
+- **Context**: Removed the app-level loading overlay to eliminate the fixed 800ms delay and cleaned up unused exports; added explicit Turbopack root config.
+- **Key Decisions**: Kept route-level skeleton loading while removing the blocking AppLoader; set `turbopack.root` in `next.config.mjs` to avoid root inference issues.
+- **Open Items**: None.
+- **Lessons Learned**: Prefer real loading boundaries (route + skeletons) over artificial splash delays to improve perceived performance.
+
 ### 2026-02-20 03:30 - Filmstrip: tap-only navigation, remove scroll-to-navigate
 
 **Agent:** orchestrator  
