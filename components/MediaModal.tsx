@@ -54,10 +54,12 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
   const mediaContainerRef = useRef<HTMLDivElement>(null);
 
   // ── Filmstrip native scroll ──────────────────────────────────────────
-  // Tap-only navigation: scrolling the filmstrip just browses thumbnails,
-  // only tapping a thumbnail changes the main content.
+  // Scrolling updates the centered thumbnail after scroll settles.
   const filmstripRef = useRef<HTMLDivElement>(null);
   const filmstripHasScrolled = useRef(false);
+  const filmstripIsUserScrolling = useRef(false);
+  const filmstripScrollTimeout = useRef<number | null>(null);
+  const filmstripScrollRaf = useRef<number | null>(null);
   // Map of index → button element for scrollIntoView on navigation
   const thumbElements = useRef<Map<number, HTMLButtonElement>>(new Map());
 
@@ -74,26 +76,10 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
     []
   );
 
-  // Scroll the active thumbnail into view when currentIndex changes
-  // (via swipe, arrow key, or thumbnail tap).
-  useEffect(() => {
-    const node = thumbElements.current.get(currentIndex);
-    if (!node) return;
-
-    const isFirstScroll = !filmstripHasScrolled.current;
-    node.scrollIntoView({
-      behavior: isFirstScroll ? 'instant' : 'smooth',
-      inline: 'center',
-      block: 'nearest',
-    });
-    filmstripHasScrolled.current = true;
-  }, [currentIndex]);
-
   // UI state
   const [controlsVisible, setControlsVisible] = useState(true);
   const [lastTapTime, setLastTapTime] = useState(0);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
-  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
 
   // Touch tracking for distinguishing taps from swipes
   const [touchStartPos, setTouchStartPos] = useState({ x: 0, y: 0 });
@@ -215,6 +201,137 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
     [resetView]
   );
 
+  const scrollFilmstripToIndex = useCallback((index: number, behavior: ScrollBehavior) => {
+    const container = filmstripRef.current;
+    const node = thumbElements.current.get(index);
+    if (!container || !node) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const nodeRect = node.getBoundingClientRect();
+    const containerCenter = containerRect.left + containerRect.width / 2;
+    const nodeCenter = nodeRect.left + nodeRect.width / 2;
+    const delta = nodeCenter - containerCenter;
+
+    container.scrollTo({
+      left: container.scrollLeft + delta,
+      behavior,
+    });
+  }, []);
+
+  const findCenteredIndex = useCallback(() => {
+    const container = filmstripRef.current;
+    if (!container) return null;
+
+    const containerRect = container.getBoundingClientRect();
+    const centerX = containerRect.left + containerRect.width / 2;
+    let closestIndex = 0;
+    let closestDistance = Number.POSITIVE_INFINITY;
+
+    thumbElements.current.forEach((node, index) => {
+      const rect = node.getBoundingClientRect();
+      const nodeCenter = rect.left + rect.width / 2;
+      const distance = Math.abs(nodeCenter - centerX);
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        closestIndex = index;
+      }
+    });
+
+    return closestIndex;
+  }, []);
+
+  const handleFilmstripScrollEnd = useCallback(() => {
+    filmstripIsUserScrolling.current = false;
+    if (filmstripScrollTimeout.current) {
+      window.clearTimeout(filmstripScrollTimeout.current);
+      filmstripScrollTimeout.current = null;
+    }
+
+    const centeredIndex = findCenteredIndex();
+    if (centeredIndex === null) return;
+
+    if (centeredIndex !== currentIndex) {
+      changeMediaIndex(centeredIndex);
+    } else {
+      scrollFilmstripToIndex(centeredIndex, 'smooth');
+    }
+  }, [changeMediaIndex, currentIndex, findCenteredIndex, scrollFilmstripToIndex]);
+
+  const handleFilmstripScroll = useCallback(() => {
+    filmstripIsUserScrolling.current = true;
+
+    if (filmstripScrollTimeout.current) {
+      window.clearTimeout(filmstripScrollTimeout.current);
+    }
+
+    filmstripScrollTimeout.current = window.setTimeout(() => {
+      handleFilmstripScrollEnd();
+    }, 120);
+  }, [handleFilmstripScrollEnd]);
+
+  const handleFilmstripPointerDown = useCallback(() => {
+    filmstripIsUserScrolling.current = true;
+    if (filmstripScrollTimeout.current) {
+      window.clearTimeout(filmstripScrollTimeout.current);
+      filmstripScrollTimeout.current = null;
+    }
+  }, []);
+
+  const handleFilmstripPointerUp = useCallback(() => {
+    handleFilmstripScrollEnd();
+  }, [handleFilmstripScrollEnd]);
+
+  useEffect(() => {
+    const container = filmstripRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      if (filmstripScrollRaf.current !== null) return;
+      filmstripScrollRaf.current = window.requestAnimationFrame(() => {
+        filmstripScrollRaf.current = null;
+        handleFilmstripScroll();
+      });
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    container.addEventListener('scrollend', handleFilmstripScrollEnd, {
+      passive: true,
+    } as AddEventListenerOptions);
+    container.addEventListener('pointerdown', handleFilmstripPointerDown);
+    container.addEventListener('pointerup', handleFilmstripPointerUp);
+    container.addEventListener('pointercancel', handleFilmstripPointerUp);
+
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+      container.removeEventListener('scrollend', handleFilmstripScrollEnd as EventListener);
+      container.removeEventListener('pointerdown', handleFilmstripPointerDown);
+      container.removeEventListener('pointerup', handleFilmstripPointerUp);
+      container.removeEventListener('pointercancel', handleFilmstripPointerUp);
+      if (filmstripScrollTimeout.current) {
+        window.clearTimeout(filmstripScrollTimeout.current);
+        filmstripScrollTimeout.current = null;
+      }
+      if (filmstripScrollRaf.current !== null) {
+        window.cancelAnimationFrame(filmstripScrollRaf.current);
+        filmstripScrollRaf.current = null;
+      }
+    };
+  }, [
+    handleFilmstripPointerDown,
+    handleFilmstripPointerUp,
+    handleFilmstripScroll,
+    handleFilmstripScrollEnd,
+  ]);
+
+  // Scroll the active thumbnail into view when currentIndex changes
+  // (via swipe, arrow key, or thumbnail tap).
+  useEffect(() => {
+    if (filmstripIsUserScrolling.current) return;
+    const behavior: ScrollBehavior = filmstripHasScrolled.current ? 'smooth' : 'auto';
+    scrollFilmstripToIndex(currentIndex, behavior);
+    filmstripHasScrolled.current = true;
+  }, [currentIndex, scrollFilmstripToIndex]);
+
   // Prefetch adjacent media for faster switching
   // Uses <link rel="prefetch"> instead of hidden <video> elements to avoid
   // DOM bloat, memory leaks, and bandwidth competition on mobile.
@@ -250,39 +367,6 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
 
   const currentItem = items[currentIndex];
   const isVideo = currentItem?.resource_type === 'video';
-
-  // Track video playback state to disable swipe navigation during playback
-  useEffect(() => {
-    if (!isOpen || !isVideo) {
-      setIsVideoPlaying(false);
-      return;
-    }
-
-    const container = mediaContainerRef.current;
-    if (!container) return;
-
-    const video = container.querySelector('video');
-    if (!video) {
-      setIsVideoPlaying(false);
-      return;
-    }
-
-    const handlePlay = () => setIsVideoPlaying(true);
-    const handlePause = () => setIsVideoPlaying(false);
-    const handleEnded = () => setIsVideoPlaying(false);
-
-    video.addEventListener('play', handlePlay);
-    video.addEventListener('pause', handlePause);
-    video.addEventListener('ended', handleEnded);
-
-    setIsVideoPlaying(!video.paused && !video.ended);
-
-    return () => {
-      video.removeEventListener('play', handlePlay);
-      video.removeEventListener('pause', handlePause);
-      video.removeEventListener('ended', handleEnded);
-    };
-  }, [isOpen, isVideo, currentIndex]);
 
   // Memoize media props to prevent unnecessary re-fetches
   const currentMediaProps = useMemo(() => {
@@ -458,12 +542,12 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
   // Swipe handlers (only when not zoomed to avoid conflicts)
   const handlers = useSwipeable({
     onSwipedLeft: () => {
-      if (zoom === 1 && !isPinching && !isVideoPlaying && currentIndex < items.length - 1) {
+      if (zoom === 1 && !isPinching && currentIndex < items.length - 1) {
         changeMediaIndex(currentIndex + 1);
       }
     },
     onSwipedRight: () => {
-      if (zoom === 1 && !isPinching && !isVideoPlaying && currentIndex > 0) {
+      if (zoom === 1 && !isPinching && currentIndex > 0) {
         changeMediaIndex(currentIndex - 1);
       }
     },
@@ -493,7 +577,7 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
 
           <div
             className="relative z-50 flex w-full max-w-7xl items-center justify-center p-4"
-            {...(zoom === 1 && !isPinching && !isVideoPlaying ? handlers : {})}
+            {...(zoom === 1 && !isPinching ? handlers : {})}
           >
             <div className="w-full h-full flex items-center justify-center">
               <div
@@ -664,6 +748,7 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
                     WebkitOverflowScrolling: 'touch',
                     scrollbarWidth: 'none',
                     msOverflowStyle: 'none',
+                    overscrollBehaviorX: 'contain',
                   }}
                 >
                   {/* Leading spacer — centers first item */}
