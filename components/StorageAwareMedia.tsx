@@ -277,7 +277,7 @@ export function StorageAwareMedia({
         tabIndex={tabIndex}
         onKeyDown={onKeyDown}
       >
-        {isLoading && !loadError && (
+        {isLoading && !loadError && context !== 'modal' && (
           <div className="absolute inset-0 bg-gray-200 dark:bg-gray-800 animate-pulse rounded-lg" />
         )}
 

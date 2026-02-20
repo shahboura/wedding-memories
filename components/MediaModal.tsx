@@ -551,8 +551,8 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
         changeMediaIndex(currentIndex - 1);
       }
     },
-    delta: 50,
-    swipeDuration: 300,
+    delta: 35,
+    swipeDuration: 500,
     preventScrollOnSwipe: true,
     trackTouch: isTouchDevice,
     trackMouse: true,
