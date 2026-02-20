@@ -7,12 +7,22 @@ import { appConfig } from '../config';
 /**
  * Builds the /api/photos URL with optional guest isolation query param.
  */
-export function getPhotosApiUrl(guestName?: string): string {
-  let url = '/api/photos';
+export function getPhotosApiUrl(
+  guestName?: string,
+  options: { cursor?: string | null; limit?: number } = {}
+): string {
+  const params = new URLSearchParams();
   if (appConfig.guestIsolation && guestName) {
-    url += `?guest=${encodeURIComponent(guestName)}`;
+    params.set('guest', guestName);
   }
-  return url;
+  if (options.cursor) {
+    params.set('cursor', options.cursor);
+  }
+  if (typeof options.limit === 'number') {
+    params.set('limit', options.limit.toString());
+  }
+  const query = params.toString();
+  return query ? `/api/photos?${query}` : '/api/photos';
 }
 
 /**

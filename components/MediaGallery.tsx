@@ -7,12 +7,14 @@ import { getOptimizedMediaProps, prefetchMediaOnInteraction } from '../utils/med
 import { StorageAwareMedia } from './StorageAwareMedia';
 import dynamic from 'next/dynamic';
 import { getPhotosApiUrl } from '../utils/clientUtils';
+import { encodeMediaCursor, PHOTOS_PAGE_SIZE } from '../utils/pagination';
 
 const MediaModal = dynamic(() => import('./MediaModal'), { ssr: false });
 
 import {
   useMedia,
   useSetMedia,
+  useAppendMedia,
   useMediaModalOpen,
   useSelectedMediaId,
   useOpenMediaModal,
@@ -58,6 +60,7 @@ function handleMediaKeyNavigation(
 export function MediaGallery({ initialMedia }: MediaGalleryProps) {
   const media = useMedia();
   const setMedia = useSetMedia();
+  const appendMedia = useAppendMedia();
   const isModalOpen = useMediaModalOpen();
   const selectedMediaId = useSelectedMediaId();
   const openModal = useOpenMediaModal();
@@ -69,6 +72,11 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
   const guestName = useGuestName();
   const previousGuestName = useRef<string | null>(null);
   const mediaRef = useRef<MediaProps[]>(media);
+  const paginationCursorRef = useRef<string | null>(null);
+  const hasMoreRef = useRef(true);
+  const isLoadingMoreRef = useRef(false);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  const fetchAbortRef = useRef<AbortController | null>(null);
   const { t, language } = useI18n();
 
   // Resolve the selected media index from the stored ID.
@@ -82,6 +90,13 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
   useEffect(() => {
     if (initialMedia.length > 0 && media.length === 0) {
       setMedia(initialMedia);
+      if (initialMedia.length >= PHOTOS_PAGE_SIZE) {
+        paginationCursorRef.current = encodeMediaCursor(initialMedia[initialMedia.length - 1]);
+        hasMoreRef.current = true;
+      } else {
+        paginationCursorRef.current = null;
+        hasMoreRef.current = false;
+      }
     }
   }, [initialMedia, media.length, setMedia]);
 
@@ -107,36 +122,65 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
     return nextLatest === currentLatest && nextItems.length !== currentItems.length;
   }, []);
 
-  const refetchWeddingMediaInternal = useCallback(
+  const fetchMediaPage = useCallback(
     async (
-      options: { showLoading?: boolean; guestOverride?: string } = {}
+      options: {
+        showLoading?: boolean;
+        guestOverride?: string;
+        cursor?: string | null;
+        append?: boolean;
+      } = {}
     ): Promise<MediaProps[]> => {
-      const { showLoading = true, guestOverride } = options;
+      const { showLoading = true, guestOverride, cursor = null, append = false } = options;
       if (showLoading) {
         setIsLoading(true);
       }
+      let controller: AbortController | null = null;
+      if (!append) {
+        fetchAbortRef.current?.abort();
+        controller = new AbortController();
+        fetchAbortRef.current = controller;
+      }
+      const signal = controller?.signal;
       try {
         const guestToUse = guestOverride || guestName;
-        const response = await fetch(getPhotosApiUrl(guestToUse));
+        const fetchOptions = signal ? { signal } : undefined;
+        const response = await fetch(
+          getPhotosApiUrl(guestToUse, { cursor, limit: PHOTOS_PAGE_SIZE }),
+          fetchOptions
+        );
 
         if (response.ok) {
-          const refreshedMedia = await response.json();
-          setMedia(refreshedMedia);
+          const data = await response.json();
+          const items = data.items ?? [];
+          const nextCursor = data.nextCursor ?? null;
+          if (append) {
+            appendMedia(items);
+          } else {
+            setMedia(items);
+          }
+          paginationCursorRef.current = nextCursor;
+          hasMoreRef.current = Boolean(nextCursor);
           refresh();
-          return refreshedMedia;
-        } else {
-          console.error('Failed to refetch media:', response.statusText);
+          return items;
         }
+        console.error('Failed to fetch media:', response.statusText);
       } catch (error) {
-        console.error('Network error while refetching media:', error);
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          return [];
+        }
+        console.error('Network error while fetching media:', error);
       } finally {
         if (showLoading) {
           setIsLoading(false);
         }
+        if (!append) {
+          fetchAbortRef.current = null;
+        }
       }
       return [];
     },
-    [setMedia, setIsLoading, refresh, guestName]
+    [appendMedia, guestName, refresh, setIsLoading, setMedia]
   );
 
   useEffect(() => {
@@ -148,12 +192,14 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
 
     const fetchFresh = async () => {
       try {
-        const refreshedMedia = await refetchWeddingMediaInternal({ showLoading: false });
+        const refreshedMedia = await fetchMediaPage({ showLoading: false });
         if (cancelled) return;
 
         if (refreshedMedia.length > 0 && shouldReplaceMedia(mediaRef.current, refreshedMedia)) {
           setMedia(refreshedMedia);
           refresh();
+          paginationCursorRef.current = null;
+          hasMoreRef.current = true;
         }
       } catch (error) {
         console.error('Failed to refresh gallery media:', error);
@@ -164,7 +210,7 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
     return () => {
       cancelled = true;
     };
-  }, [guestName, refresh, setMedia, shouldReplaceMedia, refetchWeddingMediaInternal]);
+  }, [guestName, refresh, setMedia, shouldReplaceMedia, fetchMediaPage]);
 
   // Single fetch effect for guest isolation - only refetch if guest changes and we need isolation
   useEffect(() => {
@@ -172,14 +218,42 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
       const isNewGuest = previousGuestName.current !== guestName;
 
       if (isNewGuest) {
-        refetchWeddingMediaInternal({
+        paginationCursorRef.current = null;
+        hasMoreRef.current = true;
+        fetchMediaPage({
           showLoading: previousGuestName.current !== null,
           guestOverride: guestName,
+          cursor: null,
         });
         previousGuestName.current = guestName;
       }
     }
-  }, [guestName, refetchWeddingMediaInternal]);
+  }, [guestName, fetchMediaPage]);
+
+  useEffect(() => {
+    const target = loadMoreRef.current;
+    if (!target) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) return;
+        if (isLoadingMoreRef.current || !hasMoreRef.current) return;
+        if (isLoading) return;
+        isLoadingMoreRef.current = true;
+        fetchMediaPage({ showLoading: false, cursor: paginationCursorRef.current, append: true })
+          .finally(() => {
+            isLoadingMoreRef.current = false;
+          })
+          .catch(() => {
+            isLoadingMoreRef.current = false;
+          });
+      },
+      { rootMargin: '600px' }
+    );
+
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [fetchMediaPage, isLoading]);
 
   // Pre-compute optimized props for all gallery items to avoid re-calling
   // getOptimizedMediaProps on every render cycle
@@ -260,7 +334,7 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
             className="after:content group relative mb-5 block w-full cursor-pointer after:pointer-events-none after:absolute after:inset-0 after:rounded-lg after:shadow-highlight focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background"
             onClick={() => openModal(mediaItem.id)}
             onKeyDown={(e) => handleMediaKeyNavigation(e, mediaItem.id, openModal)}
-            onMouseEnter={() => prefetchMediaOnInteraction(mediaItem, 'full')}
+            onMouseEnter={() => prefetchMediaOnInteraction(mediaItem, 'medium')}
             tabIndex={0}
             aria-label={
               mediaItem.guestName && mediaItem.guestName !== 'Unknown Guest'
@@ -296,6 +370,7 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
           </div>
         ))}
       </div>
+      <div ref={loadMoreRef} aria-hidden="true" />
 
       <div
         className="sr-only"

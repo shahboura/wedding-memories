@@ -55,3 +55,8 @@ export interface ApiErrorResponse {
   error: string;
   details?: string;
 }
+
+export interface MediaPageResponse {
+  items: MediaProps[];
+  nextCursor: string | null;
+}

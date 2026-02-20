@@ -8,6 +8,7 @@ interface AppState {
 
   media: MediaProps[];
   setMedia: (media: MediaProps[]) => void;
+  appendMedia: (media: MediaProps[]) => void;
 
   isMediaModalOpen: boolean;
   selectedMediaId: number | null;
@@ -30,6 +31,7 @@ const useAppStore = create<AppState>()(
 
       media: [],
       setMedia: (media: MediaProps[]) => set({ media }),
+      appendMedia: (media: MediaProps[]) => set((state) => ({ media: [...state.media, ...media] })),
 
       isMediaModalOpen: false,
       selectedMediaId: null,
@@ -69,6 +71,7 @@ export const useSetGuestName = () => useAppStore((state) => state.setGuestName);
 
 export const useMedia = () => useAppStore((state) => state.media);
 export const useSetMedia = () => useAppStore((state) => state.setMedia);
+export const useAppendMedia = () => useAppStore((state) => state.appendMedia);
 
 export const useMediaModalOpen = () => useAppStore((state) => state.isMediaModalOpen);
 export const useSelectedMediaId = () => useAppStore((state) => state.selectedMediaId);

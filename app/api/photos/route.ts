@@ -7,7 +7,8 @@ import {
   isEventTokenRequired,
   isEventTokenValid,
 } from '../../../utils/eventToken';
-import type { MediaProps, ApiErrorResponse } from '../../../utils/types';
+import type { MediaProps, ApiErrorResponse, MediaPageResponse } from '../../../utils/types';
+import { paginateMedia, PHOTOS_PAGE_SIZE, PHOTOS_PAGE_SIZE_MAX } from '../../../utils/pagination';
 
 /**
  * Validates the guest filter request.
@@ -35,7 +36,7 @@ function validateGuestFilter(guestFilter: string | null): void {
  */
 export async function GET(
   request: NextRequest
-): Promise<NextResponse<MediaProps[] | ApiErrorResponse>> {
+): Promise<NextResponse<MediaProps[] | MediaPageResponse | ApiErrorResponse>> {
   try {
     if (isEventTokenRequired() && !isEventTokenValid(request)) {
       const errorResponse: ApiErrorResponse = {
@@ -58,15 +59,25 @@ export async function GET(
       });
     }
 
-    // Extract guest filter from query parameters
+    // Extract query parameters
     const { searchParams } = new URL(request.url);
     const guestFilter = searchParams.get('guest');
+    const cursor = searchParams.get('cursor');
+    const limitParam = searchParams.get('limit');
+    const limit = limitParam ? Number.parseInt(limitParam, 10) : PHOTOS_PAGE_SIZE;
 
     // Validate guest filter requirements
     validateGuestFilter(guestFilter);
 
     // Fetch photos from storage
     const photos = await storage.list(guestFilter || undefined);
+    const safeLimit = Number.isFinite(limit)
+      ? Math.min(Math.max(limit, 1), PHOTOS_PAGE_SIZE_MAX)
+      : PHOTOS_PAGE_SIZE;
+    const { items, nextCursor } = paginateMedia(photos, {
+      cursor,
+      limit: safeLimit,
+    });
 
     const headers: Record<string, string> = {
       'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
@@ -78,7 +89,11 @@ export async function GET(
       headers['Set-Cookie'] = eventCookieHeader;
     }
 
-    return NextResponse.json(photos, {
+    const response: MediaPageResponse = {
+      items,
+      nextCursor,
+    };
+    return NextResponse.json(response, {
       status: 200,
       headers,
     });

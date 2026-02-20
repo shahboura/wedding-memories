@@ -62,6 +62,7 @@ import {
 
 import type { UploadFile } from '../utils/types';
 import { formatFileSize, getCompressionInfo, getPhotosApiUrl } from '../utils/clientUtils';
+import { PHOTOS_PAGE_SIZE } from '../utils/pagination';
 import { getVideoMetadata, uploadWithXHR } from '../utils/uploadClient';
 import { useI18n } from './I18nProvider';
 
@@ -602,13 +603,13 @@ export const Upload = () => {
         refreshAbortRef.current?.abort();
         const controller = new AbortController();
         refreshAbortRef.current = controller;
-        const response = await fetch(getPhotosApiUrl(guestName), {
+        const response = await fetch(getPhotosApiUrl(guestName, { limit: PHOTOS_PAGE_SIZE }), {
           cache: 'no-store', // avoid stale ISR cache after upload (prevents empty gallery)
           signal: controller.signal,
         });
         if (response.ok) {
-          const freshMedia = await response.json();
-          setMedia(freshMedia);
+          const data = await response.json();
+          setMedia(data.items ?? []);
           refreshMedia();
         }
       } catch (error) {

@@ -244,45 +244,6 @@ export function StorageAwareMedia({
     setIsLoading(false);
   };
 
-  const handleSeeking = useCallback(() => {
-    const video = videoRef.current;
-    if (!video || context !== 'modal') return;
-    if (typeof navigator === 'undefined' || !navigator.userAgent.includes('Firefox')) return;
-
-    const time = video.currentTime;
-    const buffered = video.buffered;
-    if (buffered.length === 0) return;
-
-    for (let i = 0; i < buffered.length; i += 1) {
-      if (time >= buffered.start(i) && time <= buffered.end(i)) {
-        return;
-      }
-    }
-
-    let nearest = buffered.start(0);
-    let minDistance = Math.abs(time - nearest);
-
-    for (let i = 0; i < buffered.length; i += 1) {
-      const start = buffered.start(i);
-      const end = buffered.end(i);
-      const startDistance = Math.abs(time - start);
-      const endDistance = Math.abs(time - end);
-
-      if (startDistance < minDistance) {
-        minDistance = startDistance;
-        nearest = start;
-      }
-      if (endDistance < minDistance) {
-        minDistance = endDistance;
-        nearest = end;
-      }
-    }
-
-    if (Number.isFinite(nearest)) {
-      video.currentTime = nearest;
-    }
-  }, [context]);
-
   const handleVideoInteraction = () => {
     ensureVideoReady('metadata');
   };
@@ -387,7 +348,6 @@ export function StorageAwareMedia({
           controls={controls}
           poster={poster}
           onPlay={handlePlay}
-          onSeeking={handleSeeking}
           draggable={draggable}
           playsInline
           muted={isGalleryView}

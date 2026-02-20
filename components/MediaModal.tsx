@@ -627,8 +627,13 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
                       </a>
                       <button
                         onClick={() => {
+                          const url = currentItem.public_id;
+                          if (!url || !/^https?:|^\//i.test(url)) {
+                            console.warn('Blocked invalid download URL', url);
+                            return;
+                          }
                           const link = document.createElement('a');
-                          link.href = currentItem.public_id;
+                          link.href = url;
                           link.download = `wedding-photo-${currentIndex + 1}.${currentItem.format}`;
                           document.body.appendChild(link);
                           link.click();

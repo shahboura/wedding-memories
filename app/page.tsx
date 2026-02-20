@@ -3,6 +3,7 @@ import { appConfig } from '../config';
 import type { MediaProps } from '../utils/types';
 import { WeddingGallery } from '@/components/WeddingGallery';
 import { storage } from '../storage';
+import { paginateMedia, PHOTOS_PAGE_SIZE } from '../utils/pagination';
 
 export const revalidate = 60;
 
@@ -21,7 +22,9 @@ async function fetchWeddingMedia(): Promise<MediaProps[]> {
   try {
     // Get all media without guest filtering for server-side rendering
     // Blur placeholders are handled by the storage service
-    return await storage.list();
+    const media = await storage.list();
+    const { items } = paginateMedia(media, { limit: PHOTOS_PAGE_SIZE });
+    return items;
   } catch (error) {
     console.error('Failed to fetch wedding media:', error);
     throw new Error('Unable to load wedding media. Please try again later.');
