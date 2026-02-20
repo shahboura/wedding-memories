@@ -3,8 +3,6 @@
 # ============================================================
 FROM node:25-alpine AS deps
 
-RUN apk update && apk upgrade --no-cache
-
 RUN npm install -g pnpm
 
 WORKDIR /app
@@ -18,8 +16,6 @@ RUN pnpm install --frozen-lockfile --prod=false
 # Stage 2: Build the Next.js application
 # ============================================================
 FROM node:25-alpine AS builder
-
-RUN apk update && apk upgrade --no-cache
 
 # Build arguments — NEXT_PUBLIC_* vars are inlined into the JS bundle
 # by Next.js at build time, so they work on both server and client.
@@ -56,8 +52,6 @@ RUN pnpm build
 # Stage 3: Production runtime
 # ============================================================
 FROM node:25-alpine AS runner
-
-RUN apk update && apk upgrade --no-cache
 
 WORKDIR /app
 
