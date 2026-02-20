@@ -183,22 +183,25 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
     );
   }, []);
 
+  const pauseModalVideos = useCallback(() => {
+    const container = mediaContainerRef.current;
+    if (!container) return;
+    container.querySelectorAll('video').forEach((video) => {
+      if (!video.paused) {
+        video.pause();
+      }
+    });
+  }, []);
+
   const changeMediaIndex = useCallback(
     (newIndex: number) => {
       // Pause any currently playing video within the modal only
-      const container = mediaContainerRef.current;
-      if (container) {
-        container.querySelectorAll('video').forEach((video) => {
-          if (!video.paused) {
-            video.pause();
-          }
-        });
-      }
+      pauseModalVideos();
 
       setCurrentIndex(newIndex);
       resetView();
     },
-    [resetView]
+    [pauseModalVideos, resetView]
   );
 
   const scrollFilmstripToIndex = useCallback((index: number, behavior: ScrollBehavior) => {
@@ -269,19 +272,8 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
     }, 120);
   }, [handleFilmstripScrollEnd]);
 
-  const handleFilmstripPointerDown = useCallback(() => {
-    filmstripIsUserScrolling.current = true;
-    if (filmstripScrollTimeout.current) {
-      window.clearTimeout(filmstripScrollTimeout.current);
-      filmstripScrollTimeout.current = null;
-    }
-  }, []);
-
-  const handleFilmstripPointerUp = useCallback(() => {
-    handleFilmstripScrollEnd();
-  }, [handleFilmstripScrollEnd]);
-
   useEffect(() => {
+    if (!isOpen) return;
     const container = filmstripRef.current;
     if (!container) return;
 
@@ -294,19 +286,8 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
     };
 
     container.addEventListener('scroll', handleScroll, { passive: true });
-    container.addEventListener('scrollend', handleFilmstripScrollEnd, {
-      passive: true,
-    } as AddEventListenerOptions);
-    container.addEventListener('pointerdown', handleFilmstripPointerDown);
-    container.addEventListener('pointerup', handleFilmstripPointerUp);
-    container.addEventListener('pointercancel', handleFilmstripPointerUp);
-
     return () => {
       container.removeEventListener('scroll', handleScroll);
-      container.removeEventListener('scrollend', handleFilmstripScrollEnd as EventListener);
-      container.removeEventListener('pointerdown', handleFilmstripPointerDown);
-      container.removeEventListener('pointerup', handleFilmstripPointerUp);
-      container.removeEventListener('pointercancel', handleFilmstripPointerUp);
       if (filmstripScrollTimeout.current) {
         window.clearTimeout(filmstripScrollTimeout.current);
         filmstripScrollTimeout.current = null;
@@ -316,21 +297,16 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
         filmstripScrollRaf.current = null;
       }
     };
-  }, [
-    handleFilmstripPointerDown,
-    handleFilmstripPointerUp,
-    handleFilmstripScroll,
-    handleFilmstripScrollEnd,
-  ]);
+  }, [handleFilmstripScroll, isOpen]);
 
   // Scroll the active thumbnail into view when currentIndex changes
   // (via swipe, arrow key, or thumbnail tap).
   useEffect(() => {
-    if (filmstripIsUserScrolling.current) return;
+    if (!isOpen || filmstripIsUserScrolling.current) return;
     const behavior: ScrollBehavior = filmstripHasScrolled.current ? 'smooth' : 'auto';
     scrollFilmstripToIndex(currentIndex, behavior);
     filmstripHasScrolled.current = true;
-  }, [currentIndex, scrollFilmstripToIndex]);
+  }, [currentIndex, isOpen, scrollFilmstripToIndex]);
 
   // Prefetch adjacent media for faster switching
   // Uses <link rel="prefetch"> instead of hidden <video> elements to avoid
@@ -555,14 +531,22 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
     swipeDuration: 500,
     preventScrollOnSwipe: true,
     trackTouch: isTouchDevice,
-    trackMouse: true,
+    trackMouse: false,
     touchEventOptions: isTouchDevice ? { passive: false } : undefined,
   });
 
   if (!isOpen || !currentItem) return null;
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) {
+          pauseModalVideos();
+          onClose();
+        }
+      }}
+    >
       <DialogPortal>
         <DialogOverlay className="fixed inset-0 z-50 bg-black/70 backdrop-blur-2xl" />
         <DialogPrimitive.Content className="fixed inset-0 z-50 flex items-center justify-center w-screen h-screen-dynamic p-0 border-0 bg-transparent shadow-none">
