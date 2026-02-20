@@ -1,5 +1,4 @@
 import { ThemeProvider } from '@/components/theme-provider';
-import { AppLoader } from '@/components/AppLoader';
 import { ToasterProvider } from '@/components/ToasterProvider';
 import { I18nProvider } from '@/components/I18nProvider';
 import type { Metadata, Viewport } from 'next';
@@ -69,7 +68,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           disableTransitionOnChange
         >
           <I18nProvider>
-            <AppLoader>{children}</AppLoader>
+            {children}
             <ToasterProvider />
           </I18nProvider>
         </ThemeProvider>

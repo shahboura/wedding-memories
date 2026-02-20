@@ -1,7 +1,15 @@
+import { dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const rootDir = dirname(fileURLToPath(import.meta.url));
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
   allowedDevOrigins: process.env.DEV_ORIGIN ? [process.env.DEV_ORIGIN] : [],
+  turbopack: {
+    root: rootDir,
+  },
   images: {
     remotePatterns: [],
     // Next.js Image optimization settings

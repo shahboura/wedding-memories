@@ -65,5 +65,3 @@ export function useKeypress(
     options?.target,
   ]);
 }
-
-export default useKeypress;
