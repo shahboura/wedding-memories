@@ -198,8 +198,6 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
         if (refreshedMedia.length > 0 && shouldReplaceMedia(mediaRef.current, refreshedMedia)) {
           setMedia(refreshedMedia);
           refresh();
-          paginationCursorRef.current = null;
-          hasMoreRef.current = true;
         }
       } catch (error) {
         console.error('Failed to refresh gallery media:', error);
@@ -240,13 +238,13 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
         if (isLoadingMoreRef.current || !hasMoreRef.current) return;
         if (isLoading) return;
         isLoadingMoreRef.current = true;
-        fetchMediaPage({ showLoading: false, cursor: paginationCursorRef.current, append: true })
-          .finally(() => {
-            isLoadingMoreRef.current = false;
-          })
-          .catch(() => {
-            isLoadingMoreRef.current = false;
-          });
+        fetchMediaPage({
+          showLoading: false,
+          cursor: paginationCursorRef.current,
+          append: true,
+        }).finally(() => {
+          isLoadingMoreRef.current = false;
+        });
       },
       { rootMargin: '600px' }
     );

@@ -1,7 +1,7 @@
 import type { MediaProps } from './types';
 
-export const PHOTOS_PAGE_SIZE = 60;
-export const PHOTOS_PAGE_SIZE_MAX = 200;
+export const PHOTOS_PAGE_SIZE = 50;
+export const PHOTOS_PAGE_SIZE_MAX = 120;
 
 interface MediaCursorPayload {
   publicId: string;
