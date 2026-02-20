@@ -1211,6 +1211,7 @@ export const Upload = () => {
           }
         }}
         repositionInputs={false}
+        shouldScaleBackground={false}
       >
         <DrawerTrigger asChild>
           <TriggerButton label={t('upload.addFiles')} />

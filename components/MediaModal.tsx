@@ -215,30 +215,24 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
     const node = thumbElements.current.get(index);
     if (!container || !node) return;
 
-    const containerRect = container.getBoundingClientRect();
-    const nodeRect = node.getBoundingClientRect();
-    const containerCenter = containerRect.left + containerRect.width / 2;
-    const nodeCenter = nodeRect.left + nodeRect.width / 2;
-    const delta = nodeCenter - containerCenter;
+    const nodeCenter = node.offsetLeft + node.offsetWidth / 2;
+    const targetLeft = nodeCenter - container.clientWidth / 2;
+    const maxLeft = container.scrollWidth - container.clientWidth;
+    const clampedLeft = Math.min(Math.max(targetLeft, 0), Math.max(maxLeft, 0));
 
-    container.scrollTo({
-      left: container.scrollLeft + delta,
-      behavior,
-    });
+    container.scrollTo({ left: clampedLeft, behavior });
   }, []);
 
   const findCenteredIndex = useCallback(() => {
     const container = filmstripRef.current;
     if (!container) return null;
 
-    const containerRect = container.getBoundingClientRect();
-    const centerX = containerRect.left + containerRect.width / 2;
+    const centerX = container.scrollLeft + container.clientWidth / 2;
     let closestIndex = 0;
     let closestDistance = Number.POSITIVE_INFINITY;
 
     thumbElements.current.forEach((node, index) => {
-      const rect = node.getBoundingClientRect();
-      const nodeCenter = rect.left + rect.width / 2;
+      const nodeCenter = node.offsetLeft + node.offsetWidth / 2;
       const distance = Math.abs(nodeCenter - centerX);
       if (distance < closestDistance) {
         closestDistance = distance;
@@ -250,6 +244,7 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
   }, []);
 
   const handleFilmstripScrollEnd = useCallback(() => {
+    if (!isOpen) return;
     filmstripIsUserScrolling.current = false;
     if (filmstripScrollTimeout.current) {
       window.clearTimeout(filmstripScrollTimeout.current);
@@ -264,9 +259,10 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
     } else {
       scrollFilmstripToIndex(centeredIndex, 'smooth');
     }
-  }, [changeMediaIndex, currentIndex, findCenteredIndex, scrollFilmstripToIndex]);
+  }, [changeMediaIndex, currentIndex, findCenteredIndex, isOpen, scrollFilmstripToIndex]);
 
   const handleFilmstripScroll = useCallback(() => {
+    if (!isOpen) return;
     filmstripIsUserScrolling.current = true;
 
     if (filmstripScrollTimeout.current) {
@@ -276,7 +272,7 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
     filmstripScrollTimeout.current = window.setTimeout(() => {
       handleFilmstripScrollEnd();
     }, 120);
-  }, [handleFilmstripScrollEnd]);
+  }, [handleFilmstripScrollEnd, isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
