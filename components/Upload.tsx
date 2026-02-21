@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { appConfig } from '../config';
 import { isMobileDevice } from '../utils/device';
@@ -195,14 +195,6 @@ export const Upload = () => {
     }
   }, [lastUploadSuccessCount, files.length, isOpen, toast, t]);
 
-  const isValidMediaFile = (file: File): boolean => {
-    try {
-      return validateMediaFile(file, true, true);
-    } catch {
-      return false;
-    }
-  };
-
   const createThumbnail = (file: File): Promise<string> => {
     return new Promise((resolve) => {
       try {
@@ -329,22 +321,8 @@ export const Upload = () => {
         combined.set(new Uint8Array(tail), head.byteLength);
         combined.set(sizeBytes, head.byteLength + tail.byteLength);
         arrayBuffer = combined.buffer;
-      } else if (file.arrayBuffer) {
-        arrayBuffer = await file.arrayBuffer();
       } else {
-        arrayBuffer = await new Promise<ArrayBuffer>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => {
-            const result = reader.result;
-            if (result && result instanceof ArrayBuffer) {
-              resolve(result);
-            } else {
-              reject(new Error('Failed to read file as ArrayBuffer'));
-            }
-          };
-          reader.onerror = () => reject(reader.error || new Error('FileReader error'));
-          reader.readAsArrayBuffer(file);
-        });
+        arrayBuffer = await file.arrayBuffer();
       }
 
       const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
@@ -375,7 +353,7 @@ export const Upload = () => {
 
     const validFiles = Array.from(fileList).filter((file) => {
       try {
-        return isValidMediaFile(file);
+        return validateMediaFile(file, true, true);
       } catch {
         return false;
       }
@@ -460,10 +438,6 @@ export const Upload = () => {
       newSet.delete(id);
       return newSet;
     });
-  };
-
-  const confirmRemoveFile = (id: string) => {
-    setFileToDelete(id);
   };
 
   const toggleFileSelection = (id: string) => {
@@ -678,35 +652,29 @@ export const Upload = () => {
     });
   };
 
-  const handleDrawerOpenChange = useCallback(
-    (open: boolean) => {
-      setIsOpen(open);
-      if (!open) {
-        setLastUploadSuccessCount(0);
-        setIsEditingNameMobile(false);
-        setNameError(null);
-        // Clear stale file input state on close — Safari can trigger
-        // unexpected behaviour if the input retains a previous selection
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
+  const handleDrawerOpenChange = (open: boolean) => {
+    setIsOpen(open);
+    if (!open) {
+      setLastUploadSuccessCount(0);
+      setIsEditingNameMobile(false);
+      setNameError(null);
+      // Clear stale file input state on close — Safari can trigger
+      // unexpected behaviour if the input retains a previous selection
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
       }
-    },
-    [setIsOpen, setLastUploadSuccessCount, setIsEditingNameMobile, setNameError]
-  );
+    }
+  };
 
-  const handleDialogOpenChange = useCallback(
-    (open: boolean) => {
-      setIsOpen(open);
-      if (!open) {
-        setLastUploadSuccessCount(0);
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
+  const handleDialogOpenChange = (open: boolean) => {
+    setIsOpen(open);
+    if (!open) {
+      setLastUploadSuccessCount(0);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
       }
-    },
-    [setIsOpen, setLastUploadSuccessCount]
-  );
+    }
+  };
 
   const handleViewGallery = () => {
     setIsOpen(false);
@@ -719,7 +687,6 @@ export const Upload = () => {
   const hasCompleted = files.some((f) => f.status === 'success' || f.status === 'error');
   const pendingCount = files.filter((f) => f.status === 'pending').length;
   const uploadingCount = files.filter((f) => f.status === 'uploading').length;
-  const successCount = lastUploadSuccessCount;
   const pendingFiles = files.filter((f) => f.status === 'pending');
   const selectedPendingFiles = pendingFiles.filter((f) => selectedFiles.has(f.id));
   const allPendingSelected =
@@ -743,9 +710,6 @@ export const Upload = () => {
           handleFileSelect(e.dataTransfer.files);
         }}
         onDragOver={(e) => {
-          e.preventDefault();
-        }}
-        onDragEnter={(e) => {
           e.preventDefault();
         }}
         onClick={() => {
@@ -882,7 +846,7 @@ export const Upload = () => {
                           setIsSelectionMode(true);
                           toggleFileSelection(uploadFile.id);
                         } else {
-                          confirmRemoveFile(uploadFile.id);
+                          setFileToDelete(uploadFile.id);
                         }
                       }
                     }}
@@ -1110,14 +1074,14 @@ export const Upload = () => {
             {uploadContent}
 
             <DialogFooter className="flex-shrink-0">
-              {successCount > 0 && pendingCount === 0 ? (
+              {lastUploadSuccessCount > 0 && pendingCount === 0 ? (
                 // Show "View Gallery" and "Close" when uploads are complete
                 <div className="grid grid-cols-2 gap-2 w-full">
                   <Button variant="outline" onClick={() => handleDialogOpenChange(false)}>
                     {t('upload.close')}
                   </Button>
                   <Button onClick={handleViewGallery} className="bg-green-600 hover:bg-green-700">
-                    {t('upload.viewGallery', { count: successCount })}
+                    {t('upload.viewGallery', { count: lastUploadSuccessCount })}
                   </Button>
                 </div>
               ) : (
@@ -1351,7 +1315,7 @@ export const Upload = () => {
           <div className="flex-1 flex flex-col min-h-0">{uploadContent}</div>
 
           <DrawerFooter className="flex-shrink-0 border-t bg-background/95 backdrop-blur">
-            {successCount > 0 && pendingCount === 0 ? (
+            {lastUploadSuccessCount > 0 && pendingCount === 0 ? (
               // Show "View Gallery" and "Close" when uploads are complete
               <div className="grid grid-cols-2 gap-2">
                 <DrawerClose asChild>
@@ -1360,7 +1324,7 @@ export const Upload = () => {
                   </Button>
                 </DrawerClose>
                 <Button onClick={handleViewGallery} className="bg-green-600 hover:bg-green-700">
-                  {t('upload.viewGallery', { count: successCount })}
+                  {t('upload.viewGallery', { count: lastUploadSuccessCount })}
                 </Button>
               </div>
             ) : (

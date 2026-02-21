@@ -23,7 +23,6 @@ import {
   useIsLoadingMedia,
   useRefreshCounter,
   useSetIsLoadingMedia,
-  useRefreshMedia,
   useGuestName,
 } from '../store/useAppStore';
 import { useI18n } from './I18nProvider';
@@ -32,7 +31,7 @@ interface MediaGalleryProps {
   initialMedia: MediaProps[];
 }
 
-function formatUploadDate(dateString: string, locale: string = 'en-US'): string {
+function formatUploadDate(dateString: string, locale: string): string {
   try {
     return new Date(dateString).toLocaleDateString(locale, {
       year: 'numeric',
@@ -69,10 +68,8 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
   const isLoading = useIsLoadingMedia();
   const refreshCounter = useRefreshCounter();
   const setIsLoading = useSetIsLoadingMedia();
-  const refresh = useRefreshMedia();
   const guestName = useGuestName();
   const previousGuestName = useRef<string | null>(null);
-  const mediaRef = useRef<MediaProps[]>(media);
   const paginationCursorRef = useRef<string | null>(null);
   const hasMoreRef = useRef(true);
   const isLoadingMoreRef = useRef(false);
@@ -101,28 +98,6 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
       }
     }
   }, [initialMedia, media.length, setMedia]);
-
-  useEffect(() => {
-    mediaRef.current = media;
-  }, [media]);
-
-  const shouldReplaceMedia = useCallback((currentItems: MediaProps[], nextItems: MediaProps[]) => {
-    if (nextItems.length === 0) {
-      return currentItems.length === 0;
-    }
-    const getLatestTimestamp = (items: MediaProps[]): number => {
-      return items.reduce((latest, item) => {
-        if (!item.uploadDate) return latest;
-        const timestamp = new Date(item.uploadDate).getTime();
-        return Number.isFinite(timestamp) ? Math.max(latest, timestamp) : latest;
-      }, 0);
-    };
-
-    const currentLatest = getLatestTimestamp(currentItems);
-    const nextLatest = getLatestTimestamp(nextItems);
-    if (nextLatest > currentLatest) return true;
-    return nextLatest === currentLatest && nextItems.length !== currentItems.length;
-  }, []);
 
   const fetchMediaPage = useCallback(
     async (
@@ -163,7 +138,6 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
           }
           paginationCursorRef.current = nextCursor;
           hasMoreRef.current = Boolean(nextCursor);
-          refresh();
           return items;
         }
         console.error('Failed to fetch media:', response.statusText);
@@ -182,7 +156,7 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
       }
       return [];
     },
-    [appendMedia, guestName, refresh, setIsLoading, setMedia]
+    [appendMedia, guestName, setIsLoading, setMedia]
   );
 
   useEffect(() => {
@@ -199,27 +173,10 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
       return;
     }
 
-    let cancelled = false;
-
-    const fetchFresh = async () => {
-      try {
-        const refreshedMedia = await fetchMediaPage({ showLoading: false });
-        if (cancelled) return;
-
-        if (refreshedMedia.length > 0 && shouldReplaceMedia(mediaRef.current, refreshedMedia)) {
-          setMedia(refreshedMedia);
-          refresh();
-        }
-      } catch (error) {
-        console.error('Failed to refresh gallery media:', error);
-      }
-    };
-
-    fetchFresh();
-    return () => {
-      cancelled = true;
-    };
-  }, [guestName, refresh, setMedia, shouldReplaceMedia, fetchMediaPage]);
+    fetchMediaPage({ showLoading: false }).catch((error) => {
+      console.error('Failed to refresh gallery media:', error);
+    });
+  }, [guestName, fetchMediaPage]);
 
   // Single fetch effect for guest isolation - only refetch if guest changes and we need isolation
   useEffect(() => {

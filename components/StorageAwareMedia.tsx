@@ -27,7 +27,6 @@ interface StorageAwareMediaProps extends Omit<MediaProps, 'id' | 'public_id'> {
   onKeyDown?: (e: React.KeyboardEvent) => void;
   onLoad?: () => void;
   draggable?: boolean;
-  poster?: string;
   controls?: boolean;
   context?: 'gallery' | 'modal' | 'thumb';
   /** Next.js Image placeholder mode */
@@ -55,12 +54,9 @@ export function StorageAwareMedia({
   onKeyDown,
   onLoad,
   draggable = true,
-  poster,
   controls,
   context = 'gallery',
 }: StorageAwareMediaProps) {
-  const widthNum = width;
-  const heightNum = height;
   const { t } = useI18n();
 
   // Resolve blur data URL from either source (Next.js convention or MediaProps)
@@ -85,7 +81,7 @@ export function StorageAwareMedia({
   const isDesktop = !isMobile;
   const [hasFrame, setHasFrame] = useState(false);
   const srcRef = useRef(src);
-  const isGalleryView = context === 'gallery' ? !controls : false;
+  const isGalleryView = context === 'gallery' && !controls;
 
   // Keep srcRef in sync with current src (must be in effect, not render)
   useEffect(() => {
@@ -119,8 +115,6 @@ export function StorageAwareMedia({
     }
   }, []);
 
-  // Intersection Observer: lazily upgrade preload when video scrolls into view.
-  // This avoids downloading metadata for off-screen videos on mobile data.
   // Intersection Observer: lazily upgrade preload when video scrolls into view.
   // Videos with context="thumb" are no longer rendered through this component
   // (the modal filmstrip uses static placeholders for videos instead).
@@ -156,18 +150,6 @@ export function StorageAwareMedia({
 
     // Set initial loading state only if video isn't already loaded
     setLoadError(false);
-
-    // Check if video is already loaded before setting loading state
-    if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-      hasEverHadDataRef.current = true;
-      setIsLoading(false);
-    } else if (!hasEverHadDataRef.current) {
-      setIsLoading(true);
-    }
-
-    const handleLoadedMetadata = () => {
-      setIsLoading(false);
-    };
 
     const handleCanPlay = () => {
       // Video is ready to play
@@ -218,7 +200,6 @@ export function StorageAwareMedia({
 
     // Add event listeners
     video.addEventListener('loadstart', handleLoadStart);
-    video.addEventListener('loadedmetadata', handleLoadedMetadata);
     video.addEventListener('canplay', handleCanPlay);
     video.addEventListener('waiting', handleWaiting);
     video.addEventListener('stalled', handleStalled);
@@ -227,7 +208,6 @@ export function StorageAwareMedia({
 
     return () => {
       video.removeEventListener('loadstart', handleLoadStart);
-      video.removeEventListener('loadedmetadata', handleLoadedMetadata);
       video.removeEventListener('canplay', handleCanPlay);
       video.removeEventListener('waiting', handleWaiting);
       video.removeEventListener('stalled', handleStalled);
@@ -346,7 +326,6 @@ export function StorageAwareMedia({
           className={`${className} opacity-100 w-full h-full object-contain`}
           style={style}
           controls={controls}
-          poster={poster}
           onPlay={handlePlay}
           draggable={draggable}
           playsInline
@@ -387,8 +366,8 @@ export function StorageAwareMedia({
       <img
         src={src}
         alt={alt}
-        width={widthNum}
-        height={heightNum}
+        width={width}
+        height={height}
         className={`${className} transition-opacity duration-300`}
         style={{
           objectFit: 'contain',
@@ -400,11 +379,7 @@ export function StorageAwareMedia({
         onMouseEnter={onMouseEnter}
         tabIndex={tabIndex}
         onKeyDown={onKeyDown}
-        onLoad={() => {
-          setIsLoading(false);
-          onLoad?.();
-        }}
-        onLoadStart={() => setIsLoading(true)}
+        onLoad={onLoad}
         draggable={draggable}
       />
     );
@@ -417,7 +392,7 @@ export function StorageAwareMedia({
       style={
         context === 'thumb'
           ? { width: '80px', height: '80px' }
-          : { aspectRatio: `${widthNum}/${heightNum}` }
+          : { aspectRatio: `${width}/${height}` }
       }
     >
       {/* Loading skeleton — hidden when blur placeholder is available */}
@@ -429,8 +404,8 @@ export function StorageAwareMedia({
         unoptimized
         src={src}
         alt={alt}
-        width={widthNum}
-        height={heightNum}
+        width={width}
+        height={height}
         sizes={sizes}
         priority={priority}
         className={`${className} ${isLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}

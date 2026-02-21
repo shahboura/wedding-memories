@@ -4,6 +4,19 @@ import sharp from 'sharp';
 import { StorageService, UploadMetadata, UploadResult, UploadSource } from './StorageService';
 import type { MediaProps } from '../utils/types';
 
+/** File extensions recognized as uploadable/servable media. */
+const MEDIA_EXTENSIONS = new Set([
+  'jpg',
+  'jpeg',
+  'png',
+  'gif',
+  'webp',
+  'mp4',
+  'mov',
+  'avi',
+  'webm',
+]);
+
 /**
  * Local filesystem implementation of the StorageService interface.
  *
@@ -90,7 +103,7 @@ export class LocalStorageService implements StorageService {
    * Determines resource type from file extension.
    */
   private getResourceType(format: string): 'image' | 'video' {
-    const videoFormats = ['mp4', 'mov', 'avi', 'webm', 'mkv'];
+    const videoFormats = ['mp4', 'mov', 'avi', 'webm'];
     return videoFormats.includes(format.toLowerCase()) ? 'video' : 'image';
   }
 
@@ -109,9 +122,8 @@ export class LocalStorageService implements StorageService {
     const filename = `${baseName}.${fileExtension}`;
 
     const sanitizedGuestName = guestName ? this.sanitizeGuestName(guestName) : 'unknown';
-    const relativeDir = sanitizedGuestName;
-    const relativePath = `${relativeDir}/${filename}`;
-    const absoluteDir = path.join(this.basePath, relativeDir);
+    const relativePath = `${sanitizedGuestName}/${filename}`;
+    const absoluteDir = path.join(this.basePath, sanitizedGuestName);
     const absolutePath = path.join(this.basePath, relativePath);
 
     await this.ensureDir(absoluteDir);
@@ -144,7 +156,7 @@ export class LocalStorageService implements StorageService {
       width,
       height,
       format: fileExtension,
-      resource_type: source.mimeType.startsWith('video/') ? 'video' : 'image',
+      resource_type: this.getResourceType(fileExtension),
       created_at: new Date().toISOString(),
     };
   }
@@ -207,20 +219,7 @@ export class LocalStorageService implements StorageService {
         await this.walkDirectory(fullPath, basePath, items);
       } else if (entry.isFile()) {
         const ext = path.extname(entry.name).slice(1).toLowerCase();
-        const mediaExtensions = [
-          'jpg',
-          'jpeg',
-          'png',
-          'gif',
-          'webp',
-          'avif',
-          'mp4',
-          'mov',
-          'avi',
-          'webm',
-        ];
-
-        if (!mediaExtensions.includes(ext)) continue;
+        if (!MEDIA_EXTENSIONS.has(ext)) continue;
 
         const relativePath = path.relative(basePath, fullPath).replace(/\\/g, '/');
         const pathParts = relativePath.split('/');
