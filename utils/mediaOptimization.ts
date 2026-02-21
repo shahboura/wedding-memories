@@ -6,6 +6,7 @@
  */
 
 import type { MediaProps } from './types';
+import { isMobileDevice } from './device';
 
 const urlCache = new Map<string, string>();
 const URL_CACHE_MAX_SIZE = 5000;
@@ -112,7 +113,11 @@ export function getOptimizedMediaProps(
     quality?: 'thumb' | 'medium' | 'full';
   } = {}
 ) {
-  const { priority = false, quality = 'medium' } = options;
+  // On mobile devices, gallery items display at ~175px wide (2-column masonry).
+  // The 400w thumb variant (2.3× display width) is sharp enough for Retina
+  // screens while saving ~70-80% bandwidth vs the 1080w medium variant.
+  const defaultQuality = context === 'gallery' && isMobileDevice() ? 'thumb' : 'medium';
+  const { priority = false, quality = defaultQuality } = options;
 
   if (item.resource_type === 'video') {
     // Videos use direct URLs since we don't generate video variants yet.

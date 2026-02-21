@@ -103,445 +103,107 @@ Summaries should be added to this AGENTS.md file under a "Session Summaries" sec
 
 ## Session Summaries
 
+### 2026-02-21 13:00 - Swipe skip fix, filmstrip bounce fix, mobile gallery bandwidth optimization (H1)
+
+**Agent:** orchestrator  
+**Summary:** Fixed swipe skipping multiple photos, filmstrip bounce-back, and implemented H1 (mobile gallery serves thumb variant instead of medium — 80% bandwidth reduction).
+
+- **Swipe fix:** Changed velocity formula from `Math.floor(v*2)+1` (cap 5) to `Math.floor(v)+1` (cap 3) — normal swipes now always advance by 1, only genuinely fast flicks skip 2-3
+- **Filmstrip fix:** Added visibility check before `scrollIntoView` — only scrolls when thumbnail is outside visible area (±40px padding), eliminating bounce-back when user taps already-visible thumbnails
+- **H1 (gallery bandwidth):** `getOptimizedMediaProps()` now returns `'thumb'` (400w WebP, 25-45KB) instead of `'medium'` (1080w WebP, 150-250KB) for gallery context on mobile. Gallery display is ~175px wide, so 400w is 2.3× display width (sufficient for Retina). Modal still serves `'full'` quality for zoom.
+- **Impact:** ~8MB saved per 50-image gallery load on mobile (10MB → 1.75MB); no new variants, no pipeline changes, no backfill needed
+- **Deprioritized M2 (API caching):** ISR with `revalidate=60` + `hasInitialDataRef` skip already eliminates most filesystem walks; in-memory cache would only help on burst traffic during uploads (which invalidates cache anyway)
+
+### 2026-02-21 11:30 - Safari upload fix, smooth swipe, framer-motion removal, mobile perf quick wins
+
+**Agent:** orchestrator  
+**Summary:** Fixed two bugs (Safari upload close refresh, non-smooth swipe) and four mobile performance quick wins, plus removed framer-motion dependency entirely.
+
+- **Fix 1 (Safari):** Deferred `scrollTo` by 350ms after drawer/dialog close animation; used `behavior: 'instant'` on Safari to avoid BFCache restoration; cleared file input value on every close
+- **Fix 2 (Swipe):** Added `swipeOffsetX` for real-time drag feedback; velocity-based skip `Math.min(5, Math.floor(v*2)+1)`; rubber-band resistance (30%) at boundaries; `swipeTimerRef` for cleanup
+- **Removed framer-motion** (~32KB min+gz) — replaced single `<motion.button>` scale animation with CSS `transform: scale()` + `transition: 150ms ease-out`
+- **H2:** Skip redundant `/api/photos` fetch on gallery mount when SSR `initialMedia` already seeded the store
+- **M1:** Removed `translate3d(0,0,0)` and `will-change-auto` from gallery items (was promoting 50+ GPU compositing layers)
+- **M4:** Wired `--font-playfair` to `--font-serif` in Tailwind v4 `@theme` (font was downloaded but never used)
+- **M3:** Guarded `onMouseEnter` prefetch with `!isMobileDevice()` (tap fires mouseenter+click simultaneously)
+- Also: removed duplicate `useKeypress('=')` (double-zoom), replaced `backdrop-blur-2xl` with `bg-black/90` (GPU perf)
+
 ### 2026-02-21 10:45 - Remove AppLoader and cleanup dead exports
 
-- **Context**: Removed the app-level loading overlay to eliminate the fixed 800ms delay and cleaned up unused exports; added explicit Turbopack root config.
-- **Key Decisions**: Kept route-level skeleton loading while removing the blocking AppLoader; set `turbopack.root` in `next.config.mjs` to avoid root inference issues.
-- **Open Items**: None.
-- **Lessons Learned**: Prefer real loading boundaries (route + skeletons) over artificial splash delays to improve perceived performance.
+- Removed app-level loading overlay (fixed 800ms delay); kept route-level skeleton loading
+- Added explicit `turbopack.root` in `next.config.mjs`
 
-### 2026-02-20 03:30 - Filmstrip: tap-only navigation, remove scroll-to-navigate
+### 2026-02-20 - Modal filmstrip rewrite and video fixes (5 sessions consolidated)
 
-**Agent:** orchestrator  
-**Summary:** Changed filmstrip from scroll-to-navigate to tap-only navigation, fixing retraction bug on fast scroll and simplifying the codebase.
+**Summary:** Complete rewrite of modal filmstrip from Framer Motion transforms to native scroll, then simplified to tap-only navigation. Fixed Firefox video DOMException, swipe flicker, filmstrip click bugs, and video metadata prefetch waste.
 
-- Removed scroll listener (`findCenteredIndex`, `scrollend`/`scroll` handler) that synced `currentIndex` to filmstrip scroll position — scrolling the filmstrip no longer changes the main content
-- Removed `isProgrammaticScroll`, `isUserScrollChange`, `currentIndexRef`, `changeMediaIndexRef` refs and their sync effects — all existed solely for the scroll listener
-- Removed `scroll-snap-type: x mandatory` from container and `scrollSnapAlign: 'center'` from buttons — filmstrip is now free-scrolling with momentum
-- Removed `±5` content virtualization — all thumbnails render always (tiny gradient divs for video, small thumb images for photos; no layout reflow on fast scroll)
-- Kept: `scrollIntoView` centers active thumbnail on swipe/arrow/click navigation; `onClick` on thumbnails jumps to that item; free-scroll with momentum works naturally
-- Net -74 lines; `pnpm type-check` and `pnpm lint` both pass with zero errors/warnings
-
-### 2026-02-20 03:00 - Fix swipe flicker and filmstrip click not navigating
-
-**Agent:** orchestrator  
-**Summary:** Eliminated main-content flicker on swipe/click and fixed filmstrip thumbnails sometimes not navigating, caused by `AnimatePresence` exit animations and curried ref-callback churn.
-
-- Removed `AnimatePresence`, `MotionConfig`, and `variants` — main content now uses a plain keyed `<div>` for instant swap (no exit-fade flicker)
-- Split curried `thumbRefCallback(index)` (which depended on `[currentIndex]` and churned all refs every navigation) into stable `setThumbRef(index)` (`[]` deps, stores in Map) + separate `useEffect([currentIndex])` for `scrollIntoView`
-- Added `currentIndexRef` and `changeMediaIndexRef` synced via `useEffect` so the scroll listener uses refs instead of stale closure values — listener now registers once with `[]` deps, no teardown/re-register on navigation
-- Root causes: (1) `AnimatePresence mode="wait"` faded out old item before showing new one with no meaningful entrance animation; (2) curried ref callback with `[currentIndex]` dep caused React to call `ref(null)` then `ref(node)` for ALL buttons on every index change, triggering `scrollIntoView` which fired the scroll listener with a stale `currentIndex` closure
-- Verified: `pnpm type-check` and `pnpm lint` both pass with zero errors/warnings
-
-### 2026-02-20 02:30 - Sync filmstrip scroll position with currentIndex
-
-**Agent:** orchestrator  
-**Summary:** Fixed filmstrip user-scroll desync — manually scrolling the filmstrip now updates `currentIndex` so the main content and active thumbnail highlight stay in sync.
-
-- Added `scrollend` event listener (with debounced `scroll` fallback for browsers without `scrollend` support) that finds the nearest-centered thumbnail via `getBoundingClientRect` and calls `changeMediaIndex`
-- Merged separate `activeThumbRef` and `setThumbRef` into single `thumbRefCallback(index)` that stores every button in a `Map<number, HTMLButtonElement>` and scrolls the active one into view
-- Added `isProgrammaticScroll` ref guard with 350ms timeout to prevent feedback loops between `scrollIntoView` calls and the scroll event listener
-- Fixed ref callback timing bug: captured `isFirstScroll` before mutating `filmstripHasScrolled.current` so instant-scroll guard timeout is correctly 0ms on modal open
-- Verified: `pnpm type-check` and `pnpm lint` both pass with zero errors/warnings
-
-### 2026-02-20 02:00 - Rewrite filmstrip to native scroll with scroll-snap
-
-**Agent:** orchestrator  
-**Summary:** Replaced Framer Motion `animate.x` transform filmstrip with native `overflow-x: auto` scroll + CSS `scroll-snap-type: x mandatory` for fast random-access navigation.
-
-- Replaced `<motion.div animate={{ x }}>` with native scrollable `<div>` — enables momentum scrolling, touch drag, and random access on mobile
-- Active thumbnail centered via `scrollIntoView({ inline: 'center' })` using a `RefCallback` keyed on `currentIndex`; first scroll on modal open uses `behavior: 'instant'`, subsequent navigations use `'smooth'`
-- Added 50%-width leading/trailing spacers so first and last items can be centered
-- Fixed desktop centering bug: old code hardcoded `64px` per item but thumbnails are `w-16 md:w-20` (64px mobile, 80px desktop), causing progressive mis-centering on desktop
-- Added `scrollbar-hide` CSS utility (WebKit pseudo-element) to `styles/index.css`; Firefox/IE handled via inline `scrollbarWidth: 'none'` / `msOverflowStyle: 'none'`
-- Kept `<motion.button>` scale animation on active thumbnail and ±5 content virtualization (empty buttons preserve scroll width)
-- Verified: `pnpm type-check` and `pnpm lint` both pass with zero errors/warnings
-
-### 2026-02-20 01:30 - Fix modal filmstrip fetching all videos on open
-
-**Agent:** orchestrator  
-**Summary:** Replaced `<video>` elements in the modal filmstrip with static gradient+play placeholders to eliminate unnecessary video metadata fetches.
-
-- Root cause: filmstrip rendered `StorageAwareMedia` with `context="thumb"` for videos, which created actual `<video preload="metadata">` elements and called `video.load()` eagerly — up to 11 concurrent metadata fetches on modal open
-- Fix: video thumbnails now render a gradient+play icon `<div>` instead of `<video>` — zero network requests, identical navigation behavior
-- No impact on video playback — filmstrip thumbnails are purely navigational; the main content area loads the video independently when navigated to
-- At 64×80px, a video frame provides no meaningful visual info; the play icon is clearer UX
-- Verified: `pnpm type-check` and `pnpm lint` both pass with zero errors/warnings
-
-### 2026-02-20 01:00 - Add /api/health endpoint for Docker healthcheck
-
-**Agent:** orchestrator  
-**Summary:** Added unauthenticated health check endpoint and updated Docker healthcheck to use it.
-
-- Created `app/api/health/route.ts` returning `{ status: 'ok', uptime: N }` — no event token required, intentionally public for container orchestration
-- Updated `docker-compose.yml` healthcheck from `/api/photos` (requires auth, fails when `EVENT_TOKEN` is set) to `/api/health`
-- Investigated WebP files in main upload folder — confirmed intentional: originals preserved as-is, sharp only generates WebP variants in `thumb/` and `medium/` subdirectories
-- `docker-compose.dev.yml` intentionally left without healthcheck (local hot-reload, not orchestration)
-- Verified: `pnpm type-check` and `pnpm lint` both pass with zero errors/warnings
-
-### 2026-02-20 00:15 - Fix Firefox video seek DOMException and flicker
-
-**Agent:** orchestrator  
-**Summary:** Fixed Firefox DOMException ("fetching process aborted by the user agent") caused by seeking to an unbuffered video position in the `onLoadedMetadata` handler.
-
-- Root cause: `currentTime = 0.1` in `onLoadedMetadata` seeks blindly; Firefox with `preload="metadata"` buffers zero video frames, so the seek aborts the in-progress fetch
-- Fix: guard seek with `video.buffered.length > 0 && video.buffered.end(0) >= 0.1` — Chrome/Safari still extract first frame; Firefox keeps the gradient+play placeholder
-- Also committed: `hasEverHadDataRef` to prevent skeleton flicker during mid-playback buffering, preload rank logic to avoid redundant `video.load()` on Edge/Firefox, removed redundant `onTouchStart` handler
-- Evaluated server-side poster via ffmpeg as alternative — deferred (30-50MB Docker bloat, not justified for this fix)
-- Verified: `pnpm type-check` and `pnpm lint` both pass with zero errors/warnings
+- Replaced `<motion.div animate={{ x }}>` filmstrip with native `overflow-x: auto` scroll, then removed scroll-to-navigate entirely (tap-only)
+- Removed `AnimatePresence`/`MotionConfig` — main content uses plain keyed `<div>` (no exit-fade flicker)
+- Fixed Firefox DOMException: guard `currentTime = 0.1` seek with `video.buffered.length > 0`
+- Replaced filmstrip `<video>` thumbnails with static gradient+play placeholders (zero metadata fetches on modal open)
+- Added `hasEverHadDataRef` to prevent skeleton flicker during mid-playback buffering
+- Added `/api/health` endpoint for Docker healthcheck (unauthenticated)
+- Net result: filmstrip is free-scrolling with momentum, tap navigates, `scrollIntoView` centers active thumb
 
 ### 2026-02-19 23:30 - Dead code cleanup and blur pipeline connection
 
-**Agent:** orchestrator  
-**Summary:** Comprehensive refactor-only pass removing dead code, cloud remnants, and connecting the blur placeholder pipeline.
-
-- Deleted `imageUrl.ts` entirely (all exports dead/identity); removed `StorageProvider` enum and `storage` config; simplified storage factory to direct `LocalStorageService` singleton
-- Connected blur data pipeline end-to-end: `blurDataURL` now flows from upload → metadata → gallery → `<Image unoptimized placeholder="blur">` (was previously discarded as `_blurDataUrl`)
-- Removed dead store state (`isUploadModalOpen`, `lastRefreshTime` → `refreshCounter`), narrowed `selectedMediaId` to `number | null`
-- Extracted shared utilities: `getPhotosApiUrl()` in `clientUtils.ts`, `isMobileDevice()` in new `utils/device.ts`
-- Cleaned dead code across Upload.tsx (dead props, useSearchParams), MediaModal.tsx (duplicate variant, dead wrappers), MediaGallery.tsx (unreachable render branch), LocalStorageService.ts (dead ID counter)
-- Net -119 lines across 16 files; zero type errors, zero lint warnings
-- **Explicitly skipped:** Upload footer extraction (layout risk), centralize fetching (too large), video poster ffmpeg (50MB Docker bloat)
-
-### 2026-02-19 21:45 - Compose passes EVENT_TOKEN
-
-**Agent:** orchestrator  
-**Summary:** Passed EVENT_TOKEN into docker compose environments.
-
-- Added EVENT_TOKEN to docker-compose.yml runtime env
-- Added EVENT_TOKEN to docker-compose.dev.yml env
-- Enables token gating in Docker without rebuild
-
-### 2026-02-19 21:10 - Cleanup pass and token flow clarification
-
-**Agent:** orchestrator  
-**Summary:** Cleaned up docs and storage references; clarified token flow and enforced access page.
-
-- Updated README with single QR token flow note
-- Cleaned CONTRIBUTING.md storage references (local-only)
-- Updated StorageService docs to local-first
-- Handoff to: codebase for final testing
-
-### 2026-02-19 20:30 - AGENTS.md summary check
-
-**Agent:** review  
-**Summary:** Reviewed AGENTS.md for latest entries and guidance.
-
-- Confirmed newest entry is 2026-02-19 20:10 (event token middleware guard)
-- No newer summaries found in file
-- Recommendation: add a new summary if post-20:10 changes exist
-
-### 2026-02-19 20:10 - Event token middleware guard
-
-**Agent:** planner  
-**Summary:** Enforced event-token access across pages via middleware and added access page.
-
-- Added middleware to require EVENT_TOKEN cookie for all non-API routes
-- Added /event/access page for unauthorized visitors
-- Redirects unauthenticated users to /event/access
-- Handoff to: codebase for final testing
-
-### 2026-02-19 19:10 - Event token QR route + streaming upload refactor
-
-**Agent:** planner  
-**Summary:** Implemented /event token QR route, streaming uploads, and refactors.
-
-- Added /event?token=... route to set HttpOnly cookie and redirect to gallery
-- Switched upload pipeline to Busboy streaming + XHR progress with server/client helpers
-- Added rate-limit configurability and event token guidance in env templates
-- Removed CHANGELOG and cleaned dead video upload types
-- Updated README for token QR link and fixed outdated component list
-- Handoff to: codebase for final testing
-
-### 2026-02-19 18:40 - Event token QR route + streaming upload refactor
-
-**Agent:** planner  
-**Summary:** Added /event token redirect flow and streamlined upload pipeline.
-
-- Implemented /event?token=... route to set HttpOnly cookie and redirect to gallery
-- Added streaming upload pipeline with Busboy + XHR progress and extracted helpers
-- Added rate-limit configurability, event token guidance, removed CHANGELOG, and cleaned dead code
-- Updated README and env templates for token usage and QR link
-- Handoff to: codebase for any further cleanup or testing
-
-### 2026-02-19 14:20 - Event token URL + streaming upload refactor
-
-**Agent:** planner  
-**Summary:** Added /event token redirect flow and refactored upload handling.
-
-- Implemented /event?token=... route to set HttpOnly cookie and redirect to gallery
-- Added streaming upload pipeline with Busboy + XHR progress and extracted helpers
-- Added rate-limit configurability, event token guidance, removed CHANGELOG, and cleaned dead code
-- Updated README and env templates for token usage and QR link
-- Handoff to: codebase for any further cleanup or testing
-
-### 2026-02-18 16:45 - Local-only pipeline + ISR refresh
-
-**Agent:** orchestrator
-
-- **Context**: Completed local-only refactor follow-ups, sharp image variants + metadata, ISR refresh fix, and docs/comment cleanup.
-- **Key Decisions**: Store image metadata in per-guest `/meta/` folders; use client-side video metadata (width/height) to avoid ffmpeg; background refresh only replaces gallery when server data is newer.
-- **Open Items**: Task 4 Android video preload, Task 5 swipe sensitivity, Task 6 MediaModal evaluation doc, Task 7 final AGENTS.md summary; Migration-Plan.md still untracked.
-- **Lessons Learned**: Background revalidate avoids ISR staleness without flicker; client video metadata is a safe stopgap for layout until server-side probing is added.
-
-### 2026-02-18 14:30 - Review Task 1/2 gaps
-
-**Agent:** review  
-**Summary:** Reviewed recent changes against Migration-Plan.md focusing on Task 1 (local-only removal) and Task 2 (sharp pipeline).
-
-- Noted remaining cloud/provider references and outdated docs/comments (README, validation.ts, app/page.tsx, mediaOptimization.ts, StorageAwareMedia.tsx, api/media route comment, AGENTS.md) that contradict local-only goal
-- Found Task 2 partially implemented: LocalStorageService now uses sharp for image variants + blur, but video metadata/variants still hardcoded and uploadVideo unused
-- Identified risks: video dimensions remain 720x480 placeholders; upload API never uses uploadVideo; doc mismatches could mislead deployment
-- Recommended cleanup of dead/legacy interfaces (VideoUploadData) and presigned upload response types in api/upload response shape
-
-### 2026-02-18 — Bug Fixes (Wrong Modal Item, Upload Placeholders, Video Thumbnails) & View Switcher Evaluation
-
-**Agent:** orchestrator
-
-**What was done:**
-
-- **fix(bcb1992): gallery opens wrong item after refetch, uploaded media shows placeholder**
-  - Root cause: per-file `addMedia()` inserted fake items with `Date.now()` IDs, empty `blurDataUrl`, and no video data — these showed as grey placeholders and shifted array positions causing modal to open wrong item
-  - Replaced with single `/api/photos` refetch after all uploads complete
-  - Changed modal selection from index-based to ID-based (`selectedMediaId` instead of `selectedMediaIndex`)
-  - Removed `addMedia` from Zustand store entirely
-  - Track upload success via return values instead of mutating inside React setState callback
-
-- **fix(c2eba87): video thumbnails show placeholder instead of black rectangle on mobile**
-  - Root cause: gallery videos used `preload="none"` on mobile → zero bytes downloaded → black rectangle. Desktop used `preload="auto"` → browser extracted first frame → worked
-  - Solution: Hybrid lazy-load approach (Option 4 — chosen over server-side ffmpeg posters, global `preload="metadata"`, and client-side canvas extraction)
-  - `preload="none"` on page load (zero bandwidth), Intersection Observer upgrades to `preload="metadata"` when video scrolls within 200px of viewport, `onLoadedMetadata` seeks to 0.1s, `onSeeked` sets `hasFrame=true` replacing placeholder with real first frame
-  - Styled gradient + play icon placeholder shown until first frame extracted (instead of black rectangle)
-  - `hasFrame` resets on `src` change to handle gallery refetch correctly
-
-- **decision: view switcher evaluated and rejected**
-  - Evaluated 3 views: masonry (current), grid (fixed square cells), list (thumbnail + text rows)
-  - Current CSS columns masonry layout is already optimal for mobile wedding guests: full-width single column on phones, preserves natural aspect ratios, no cropping
-  - Grid crops composition and wastes bandwidth on cropped pixels; list optimizes for 1000+ items (not needed for 50-200)
-  - With Local storage (no CDN transforms), all views serve the same full-resolution file — zero benefit from different view modes
-  - View switcher adds cognitive load for non-technical wedding guests who use the app once
-
-**Key decisions & instructions for future sessions:**
-
-- Use `NEXT_PUBLIC_` prefix for all client-visible env vars — baked at build time
-- **Turkish language has been REMOVED** — locale file deleted, enum value removed
-- **Keep `node:25-alpine`** in Dockerfile — intentional choice
-- **Sign commits with GPG** (`--gpg-sign`)
-- Primary audience: **mobile wedding guests on mobile data** — bandwidth matters for every feature decision
-- Storage provider is **Local** (`NEXT_PUBLIC_STORAGE_PROVIDER=local`) — self-hosted Docker with volume mount
-- Guest isolation defaults to **false** (shared gallery) — `=== 'true'` instead of `!== 'false'`
-- `sharp@^0.34.3` is in `package.json` but **NOT imported anywhere** in source (Next.js may use internally). Available for image processing without adding dependency
-- **No ffmpeg** in project — would need to be added for server-side video poster generation
-- `LocalStorageService` hardcodes `width: 720, height: 480` for all media — no actual dimension extraction
-- `viewport-fit: 'cover'` is set in `layout.tsx`, making all `env(safe-area-inset-*)` values functional
-
-**Architecture notes:**
-
-- Next.js 16, React 19, Tailwind CSS v4, Zustand, Framer Motion, Radix UI
-- Storage abstracted via `StorageService` interface — Local-only
-- i18n via i18next + react-i18next (English, Malay)
-- Docker multi-stage build, standalone output
-- Guest name stored in `localStorage` via Zustand persist — zero cookies, zero server sessions
-- Modal selection is ID-based (`selectedMediaId: number | string | null` in store)
-
-**Open items (not urgent):**
-
-- I2: Change `selectedMediaId: number | string | null` → `number | null` (dead `string` branch since `addMedia` removed)
-- P6: Local images served at full resolution (needs sharp pipeline)
-- P8: No pagination on media list API
-- H2: Download URL not validated against `javascript:` scheme in MediaModal
-- O3: Duplicate `/api/photos` URL construction in Upload.tsx and MediaGallery.tsx
-- O5: No AbortController on gallery refetch in handleUploadAll
-- `LocalStorageService` hardcodes video dimensions — no actual video probing
-
-**Verification:** `pnpm type-check` and `pnpm lint` both pass with zero errors/warnings.
-
----
-
-### 2026-02-16 — Docker Runtime Fix, Local Storage Support & Dead Code Cleanup
-
-**Agent:** orchestrator
-**Summary:** Fixed Docker runtime errors (Cloudinary warnings + preload spam), added proper `StorageProvider.Local` handling across the client, renamed `STORAGE_PROVIDER` → `NEXT_PUBLIC_STORAGE_PROVIDER`, and cleaned up dead code across 6 files.
-
-**What was done:**
-
-- **Docker runtime fix** — Root cause: `STORAGE_PROVIDER` env var lacked `NEXT_PUBLIC_` prefix, so client-side code defaulted to Cloudinary, causing "cloud name not configured" warnings and 14+ `<link rel="preload">` spam. Renamed to `NEXT_PUBLIC_STORAGE_PROVIDER` across `config.ts`, `docker-compose.yml`, `.env.docker.example`, `Dockerfile`, `validate-env.cjs`, `route.ts`, and `README.md`
-- **Local storage client support** — Added `StorageProvider.Local` branches in `imageUrl.ts` (all 5 public methods + new `getLocalUrl` private method), `mediaOptimization.ts` (treats Local same as S3), and `StorageAwareMedia.tsx` (doc comment)
-- **`mediaOptimization.ts` rewrite** — Removed 3 dead exports (`shouldPrioritize`, `prefetchModalMediaNavigation`, `simpleMediaPrefetch`), removed unnecessary `export` from internal functions, removed unused `format` param, removed unreachable `default` branch, removed `videoId`/`duration`/`guestName` from video props return
-- **Dead code cleanup (6 files):**
-  - `imageUrl.ts` — Removed dead `supportsOptimization()` method; collapsed identical video/image branches in `getCloudinaryUrl`
-  - `StorageAwareMedia.tsx` — Removed unused `videoId`, `duration`, `guestName` from interface and destructuring; simplified `{ ...style }` to `style`
-  - `MediaGallery.tsx` — Removed trivial `openMediaModal` wrapper (use `openModal` directly); renamed `_error` → `error`; reduced gallery priority from `index < 6` to `index < 2`
-  - `MediaModal.tsx` — Added missing `center` animation variant; removed dead `direction` state + `setDirection`/`custom={direction}`; removed dead `loaded` state + `setLoaded`; moved misplaced imports to top; fixed stale `currentIndex` dependency
-  - `storage/index.ts` — Removed dead re-exports of `StorageService` type and `StorageProvider`
-  - `utils/types.ts` — Removed 6 dead type exports: `SharedModalProps`, `EnvironmentConfig`, `UploadResponse`, `GuestNameInputProps`, `WelcomeDialogProps`, `ApiResponse<T>`
-
-**Verification:** `pnpm type-check` and `pnpm lint` both pass with zero errors and zero warnings.
-
-**Open Items:**
-
-- Docker rebuild needed: `docker compose build --no-cache && docker compose up -d` to verify both runtime errors are gone
-- No remaining dead code issues identified
-
----
-
-### 2026-02-16 — Malay Locale, Rate Limiter Simplification, i18n & CSP Fixes
-
-**Agent:** orchestrator
-**Summary:** Added Malay (Bahasa Melayu) language support, simplified upload rate limiting, and fixed two browser-level bugs (CSP font/connect-src errors, language switching only working on second click).
-
-**What was done:**
-
-- **Malay locale (`ms`)** — Created `locales/ms/common.json` with full 130+ string translations; registered in `lib/i18n.ts`, added `Language.Malay` to `config.ts` enum and `supportedLanguages`; added display name + 🇲🇾 flag in `SettingsPanel.tsx`; documented in `.env.docker.example`
-- **Rate limiter simplified** — Removed dual burst+sustained upload limiter (was 20/min + 50/10min); replaced with single sustained limiter (60 uploads per 10 minutes / 360 per hour). Burst limiter was counterproductive for wedding guests who naturally select 10-15 photos at once
-- **i18n language switching fix** — Rewrote `I18nProvider.tsx`: import `i18n` singleton directly instead of via `useTranslation()` hook; define `t` as plain function calling `i18n.t()` (no stale `useCallback` closure); added render-key counter to force re-render after `changeLanguage`; swapped order so `await i18n.changeLanguage()` runs before `setLanguageState()`
-- **CSP font-src fix** — Added `https://fonts.gstatic.com` to `font-src` directive (Next.js dev mode loads Google Fonts from CDN)
-- **CSP connect-src fix** — Replaced invalid `https://*.s3.*.amazonaws.com` (double wildcards not allowed in CSP) with `https://*.amazonaws.com` across img-src, media-src, and connect-src
-
-**Files changed:**
-
-- `locales/ms/common.json` (new), `lib/i18n.ts`, `config.ts`, `components/SettingsPanel.tsx` — Malay locale
-- `utils/rateLimit.ts` — simplified rate limiter
-- `components/I18nProvider.tsx` — i18n switching fix
-- `next.config.mjs` — CSP fixes
-- `.env.docker.example` — documented `ms` language option
-
-**Verification:** `pnpm type-check` and `pnpm lint` both pass with zero errors/warnings.
-
-**Open Items:**
-
-- Remaining low-severity warnings from prior review (W1-W5, S1-S2) still pending — not urgent
-
----
-
-### 2026-02-16 — Containerization & Local Storage Provider
-
-**Agent:** orchestrator
-**Summary:** Containerized the Next.js wedding-memories app with Docker and added a new `Local` storage provider for self-hosted / offline deployments.
-
-**What was built:**
-
-- **`LocalStorageService`** — Full `StorageService` implementation saving to local filesystem (mounted Docker volume)
-- **`/api/media/[...path]` route** — Serves local files with path traversal protection, MIME validation, cache headers
-- **`Dockerfile`** — 3-stage multi-stage build (deps → build → runner) with Node 22 Alpine, standalone output, non-root user
-- **`docker-compose.yml`** — Production service with all env vars and named volume for uploads
-- **`docker-compose.dev.yml`** — Dev override that mounts source code for hot-reload via `pnpm dev`
-- **`.dockerignore`** and **`.env.docker.example`** — Build context optimization and documented env template
-
-**Config changes:**
-
-- `config.ts` — Added `StorageProvider.Local`; bride/groom names, storage provider, guest isolation, language all configurable via env vars (`STORAGE_PROVIDER`, `BRIDE_NAME`, `GROOM_NAME`, `GUEST_ISOLATION`, `DEFAULT_LANGUAGE`)
-- `storage/index.ts` — Wired `LocalStorageService` into factory
-- `next.config.mjs` — Added `output: 'standalone'` for Docker
-- `validate-env.cjs` — Local storage skips cloud credential validation; reads `STORAGE_PROVIDER` env var
-- `.gitignore` — Stopped ignoring `pnpm-lock.yaml` (needed for Docker); added `/uploads/`
-
-**Key Decisions:**
-
-- `STORAGE_PROVIDER` env var overrides `config.ts` hardcoded default — compose sets it without code changes
-- Dev mode uses compose file merge (`-f docker-compose.yml -f docker-compose.dev.yml`) — one Dockerfile, zero duplication
-- Local files served through API route (not `public/`) — supports dynamic uploads and path security
-- `pnpm-lock.yaml` un-ignored from git — required for `pnpm install --frozen-lockfile` in Docker
-
-**Usage:**
-
-- Production: `docker compose up -d --build`
-- Development: `docker compose -f docker-compose.yml -f docker-compose.dev.yml up`
-- Local mode needs zero cloud credentials — just set `STORAGE_PROVIDER=local`
-
-**Verification:** `pnpm type-check` and `pnpm lint` both pass with zero errors/warnings.
-
-**Open Items:**
-
-- 28 dead exports in `validation.ts`, `errors.ts`, `rateLimit.ts`, `imageUrl.ts`, `useAppStore.ts` still pending removal (from earlier cleanup pass)
-
----
-
-### Prior session context (Phases 1–4, 8, Cleanup):
+- Deleted `imageUrl.ts` entirely; removed `StorageProvider` enum; simplified storage factory to direct `LocalStorageService` singleton
+- Connected blur data pipeline end-to-end: `blurDataURL` flows from upload to `<Image placeholder="blur">`
+- Extracted `getPhotosApiUrl()` and `isMobileDevice()` shared utilities
+- Net -119 lines across 16 files
+
+### 2026-02-19 - Event token, streaming uploads, Docker config (4 sessions consolidated)
+
+- Implemented `/event?token=...` route to set HttpOnly cookie and redirect to gallery (QR code flow)
+- Added middleware requiring EVENT_TOKEN cookie for all non-API routes; `/event/access` page for unauthorized visitors
+- Switched upload pipeline to Busboy streaming + XHR progress
+- Passed EVENT_TOKEN to docker-compose environments; cleaned docs for local-only storage
+
+### 2026-02-18 - Bug fixes, video thumbnails, local-only pipeline, sharp variants
+
+- Fixed gallery opening wrong item after refetch (changed modal selection from index-based to ID-based)
+- Fixed video thumbnails showing black rectangle on mobile (hybrid lazy-load: IntersectionObserver + `preload="metadata"` + seek to 0.1s)
+- Evaluated and rejected view switcher (masonry optimal for mobile wedding guests)
+- Completed sharp image variants + metadata pipeline; ISR refresh fix
+- Store image metadata in per-guest `/meta/` folders; client-side video metadata to avoid ffmpeg
+
+### 2026-02-16 - Docker, local storage, Malay locale, CSP fixes (3 sessions consolidated)
+
+- Containerized app: 3-stage Dockerfile, docker-compose.yml, dev override, `.dockerignore`
+- Built `LocalStorageService` with `/api/media/[...path]` route (path traversal protection, MIME validation)
+- Renamed `STORAGE_PROVIDER` to `NEXT_PUBLIC_STORAGE_PROVIDER` (fixed Cloudinary fallback bug)
+- Added Malay locale (130+ strings); simplified rate limiter; fixed i18n language switching
+- Fixed CSP font-src and connect-src directives
+- Major dead code cleanup across 6 files (removed dead types, dead state, dead exports)
+
+### Pre-2026-02-16 - Initial phases (consolidated)
 
 - Fixed blur cache, duplicate blur generation, Pages Router config, S3 pagination, presigned URL caching
 - Removed dead components (ModeToggle, LanguageSwitcher), fixed memory leaks, optimized mobile rendering
 - Updated Next.js 16, eslint-config-next 16, react-i18next 16, pinned versions
-- Cleanup pass: removed redundant state, merged identical branches, consolidated imports, fixed hook placement, removed dead ActionTypes runtime object
-- All changes verified with `pnpm type-check` and `pnpm lint` — zero errors
 
-### 2025-12-24 11:00 - Update global config location to match OpenCode standards
+## Architecture Reference
 
-**Agent:** opencode
-**Summary:** Updated global configuration directory to match OpenCode.ai documentation standards
+- **Stack:** Next.js 16, React 19, Tailwind CSS v4, Zustand, Radix UI (framer-motion removed)
+- **Storage:** Local-only (`LocalStorageService`), self-hosted Docker with volume mount
+- **i18n:** i18next + react-i18next (English, Malay); Turkish removed
+- **Auth:** EVENT_TOKEN cookie via `/event?token=...` QR flow; middleware guards all routes
+- **Docker:** Multi-stage build, standalone output, `node:25-alpine`, `/api/health` healthcheck
+- **Audience:** Mobile wedding guests on cellular data — bandwidth matters for every decision
+- **Guest isolation:** Defaults to false (shared gallery)
+- **Env vars:** Use `NEXT_PUBLIC_` prefix for all client-visible vars
+- **Video:** No ffmpeg; client-side metadata extraction; `LocalStorageService` hardcodes 720x480 dimensions
+- **Modal:** ID-based selection (`selectedMediaId: number | null`); tap-only filmstrip navigation
 
-- Modified getGlobalConfigDir() to use ~/.config/opencode/ on all platforms (Linux/macOS/Windows)
-- Updated README.md to document correct installation locations
-- Updated install.js help text to include installation location information
-- Added configuration path display in global install success message
-- All changes align with https://opencode.ai/docs/config/#global specifications
+## Open Items
 
-### 2025-12-23 21:00 - Update instructions.md with new language standards
-
-**Agent:** docs  
-**Summary:** Added comprehensive documentation sections for newly supported languages in @codebase agent
-
-- Added Go Standards section with modules, error handling, concurrency, and testing
-- Added Node.js Express Standards section with security, async/await, validation, and logging
-- Added React Next.js Standards section with TypeScript, components, accessibility, and performance
-- Updated overview to mention all supported languages
-- Included code examples and validation commands following existing format
-
-### 2025-12-23 20:00 - Commit all repository changes
-
-**Agent:** GitHub Copilot  
-**Summary:** Committed comprehensive repository updates and validated integrity
-
-- Committed 54 new files including prompts, examples, docs, scripts, and workflows
-- Installed PowerShell on Linux to enable validation script execution
-- Ran full validation suite (agents, docs, context, markdown lint) - all passed
-- Repository now includes complete OpenCode agent ecosystem with examples and tooling
-
-### 2025-12-23 19:45 - Migrate instructions and enhance agent context patterns
-
-**Agent:** orchestrator  
-**Summary:** Migrated 5 missing instruction files and standardized all agent context persistence
-
-- Copied ci-cd-hygiene, go, node-express, react-next, sql-migrations instructions from .github to .opencode
-- Enhanced all 8 agents with structured Context Persistence sections (replaced generic Session Summary Requirements)
-- Standardized timestamp format (YYYY-MM-DD HH:MM), prepend behavior, 3-5 bullet max, 100KB auto-prune
-- Updated opencode.json to reference all 11 instruction files (5 new + 6 existing)
-
-### 2025-12-23 19:30 - Complete migration from Copilot patterns to OpenCode
-
-**Agent:** codebase  
-**Summary:** Migrated best practices from .github (Copilot) to OpenCode agents, added prompts system, CI/CD workflow
-
-- Added @planner agent for read-only analysis and detailed implementation planning
-- Created 8 structured reusable prompts in .opencode/prompts/ (api-docs, code-review, generate-tests, create-readme, architecture-decision, refactor-plan, security-audit, 1-on-1-prep)
-- Optimized validate-agents.ps1 to support both Copilot (.github/agents/_.agent.md) and OpenCode (.opencode/agent/_.md) formats
-- Added GitHub Actions workflow (.github/workflows/validate.yml) for agent validation, doc link checking, and markdown linting
-- Created package.json with essential validation scripts (validate:agents, validate:docs, validate:context)
-- Updated .gitignore to allow .github/workflows/ while excluding other GitHub files
-- Updated all documentation (README.md, docs/index.md, docs/agents/README.md) to reflect new agents and prompts
-
-### 2025-12-23 18:20 - Ignore .github and commit repo
-
-**Agent:** orchestrator  
-**Summary:** Added .github to gitignore; committed remaining files.
-
-- Phase sequence and agent handoffs used: Implementation (@codebase) → Commit
-- Workflow patterns that worked well: quick ignore rule + batch commit
-- Lessons learned: Confirm tracked state before ignore; `.github` was untracked
-
-### Session Summary - Mon Dec 22 2025
-
-- **Context**: Updated brutal-critic agent to include research capabilities with YouTube creators policies and guidelines URL, and synchronized GitHub Pages documentation to include all available agents.
-- **Key Decisions**: Added research & validation section to brutal-critic instructions emphasizing platform-specific policy compliance; updated docs/index.md to include blogger and brutal-critic agents in the main agents list.
-- **Open Items**: None.
-- **Lessons Learned**: Documentation synchronization requires checking multiple files (index.md, agents/README.md, getting-started.md) to ensure consistency across all GitHub Pages content.
-
-### Session Summary - Mon Dec 22 2025
-
-- **Context**: Added the requested session summary to AGENTS.md under the Session Summaries section as instructed.
-- **Key Decisions**: Used the edit tool to insert the new summary at the top of the section to maintain chronological order.
-- **Open Items**: None.
-- **Lessons Learned**: Session summaries can be added directly using the edit tool when the content is provided.
+- **H1:** `<Image unoptimized>` bypasses responsive sizing — 1080px served to 375px phones (needs sharp `srcSet`)
+- **H5:** No video compression/variants — full original video served on cellular
+- **M2:** Filesystem walk (`readdir` + `stat`) on every `/api/photos` request (needs caching)
+- **M5:** `PAGE_SIZE = 50` with no infinite scroll — all items load at once
+- **M6:** No service worker or offline caching
+- **O3:** Duplicate `/api/photos` URL construction in Upload.tsx and MediaGallery.tsx
+- **H2:** Download URL not validated against `javascript:` scheme in MediaModal
 
 ### Session Summary - Sun Dec 21 2025
 

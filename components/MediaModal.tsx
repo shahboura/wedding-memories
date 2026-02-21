@@ -171,13 +171,27 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
 
   const scrollFilmstripToIndex = useCallback((index: number, behavior: ScrollBehavior) => {
     const node = thumbElements.current.get(index);
-    if (!node) return;
+    const container = filmstripRef.current;
+    if (!node || !container) return;
 
-    node.scrollIntoView({
-      behavior,
-      inline: 'center',
-      block: 'nearest',
-    });
+    // Only scroll when the thumbnail is outside (or near the edge of) the
+    // visible filmstrip area.  This prevents the "bounce-back" effect where
+    // scrollIntoView fights the user's own scroll momentum by re-centering a
+    // thumbnail that is already on-screen.
+    const nodeRect = node.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+    const padding = 40; // px – treat thumbnails near the edge as "not visible"
+    const isVisible =
+      nodeRect.left >= containerRect.left + padding &&
+      nodeRect.right <= containerRect.right - padding;
+
+    if (!isVisible) {
+      node.scrollIntoView({
+        behavior,
+        inline: 'center',
+        block: 'nearest',
+      });
+    }
   }, []);
 
   // Scroll the active thumbnail into view when currentIndex changes
@@ -404,7 +418,7 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
 
   // Swipe handlers (only when not zoomed to avoid conflicts)
   // Uses onSwiping for real-time drag feedback and onSwiped for
-  // velocity-based skip (fast flick = skip 2-5 items).
+  // velocity-based skip (fast flick = skip 2-3 items, normal swipe = 1).
   const handlers = useSwipeable({
     onSwiping: (eventData) => {
       if (zoom !== 1 || isPinching || isSwipeAnimating) return;
@@ -428,9 +442,9 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
       const isLeftSwipe = eventData.deltaX < 0;
       const absVelocity = Math.abs(eventData.velocity);
 
-      // Skip count from velocity (capped at 5):
-      //   v < 0.5 → 1,  v 0.5-1 → 2,  v 1-1.5 → 3,  v 1.5-2 → 4,  v ≥ 2 → 5
-      const skipCount = Math.min(5, Math.floor(absVelocity * 2) + 1);
+      // Skip count from velocity (capped at 3):
+      //   v < 1.0 → 1 (normal swipe),  v 1.0-2.0 → 2,  v ≥ 2.0 → 3 (fast flick)
+      const skipCount = Math.min(3, Math.floor(absVelocity) + 1);
 
       let targetIndex: number;
       if (isLeftSwipe) {
