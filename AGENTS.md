@@ -103,6 +103,17 @@ Summaries should be added to this AGENTS.md file under a "Session Summaries" sec
 
 ## Session Summaries
 
+### 2026-02-21 14:30 - Filmstrip bounce-back root cause fix (Option C)
+
+**Agent:** orchestrator  
+**Summary:** Fixed filmstrip bounce-back by distinguishing navigation sources — thumbnail taps skip filmstrip scroll entirely, zoom→remount uses instant centering, and arrow keys blocked during swipe animation.
+
+- **Root cause:** Three concurrent issues — (1) filmstrip scrolled on ALL `currentIndex` changes including thumbnail taps, (2) `scale(1.15)` CSS transition caused `getBoundingClientRect` geometry errors during scroll calculations, (3) filmstrip remount after zoom used smooth scroll from `scrollLeft=0`
+- **Fix:** Added `navigationSourceRef` (`'thumbnail' | 'indirect'`) — consumed atomically in the filmstrip `useEffect`; thumbnail taps → skip scroll entirely (user's finger is already there); swipe/arrow/button → minimal-reveal scroll as before
+- **Zoom remount fix:** New `useEffect` on `filmstripVisible` resets `filmstripHasScrolled` when filmstrip unmounts, ensuring next mount uses instant center (no smooth sweep)
+- **Race condition fix:** Arrow key handlers now check `isSwipeAnimating` — prevents double-navigation when pressing arrow during 200ms swipe animation
+- **Net change:** +52 / -8 lines in `MediaModal.tsx`; `pnpm type-check` and `pnpm lint` clean
+
 ### 2026-02-21 13:00 - Swipe skip fix, filmstrip bounce fix, mobile gallery bandwidth optimization (H1)
 
 **Agent:** orchestrator  
