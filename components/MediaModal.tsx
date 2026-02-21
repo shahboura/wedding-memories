@@ -163,21 +163,20 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
     filmstripHasScrolled.current = true;
   }, [currentIndex, isOpen]);
 
-  // Prefetch adjacent images for faster switching.
-  // Uses <link rel="prefetch"> (low-priority browser hint) to warm the cache
-  // for the next ±5 items.  Quality is 'full' to match what the modal displays.
-  // Videos are skipped — no video variants exist, so prefetch would download
-  // the entire original file (potentially 50MB+) on cellular.
+  // Preload adjacent images for instant switching.
+  // Uses `new Image().src` (works on all browsers including Safari, which
+  // ignores `<link rel="prefetch">` entirely).  Limited to ±2 to avoid
+  // speculatively downloading 30 MB+ of full-quality originals on cellular.
   useEffect(() => {
     if (!isOpen) return;
 
-    for (let offset = 1; offset <= 5; offset++) {
+    for (let offset = 1; offset <= 2; offset++) {
       const prev = currentIndex - offset;
       const next = currentIndex + offset;
-      if (prev >= 0 && items[prev].resource_type === 'image') {
+      if (prev >= 0) {
         prefetchMediaOnInteraction(items[prev], 'full');
       }
-      if (next < items.length && items[next].resource_type === 'image') {
+      if (next < items.length) {
         prefetchMediaOnInteraction(items[next], 'full');
       }
     }

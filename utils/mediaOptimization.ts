@@ -75,33 +75,41 @@ function getResponsiveMediaSizes(context: 'gallery' | 'modal' | 'thumb'): string
 }
 
 /**
- * Simple media prefetch utility for immediate use (like on hover)
+ * Preload an image by creating a hidden `new Image()`.
+ *
+ * Why not `<link rel="prefetch">`?  Safari ignores it entirely — so every
+ * iPhone user (40-60 % of wedding guests) got zero prefetch benefit.
+ * `new Image().src` works in every browser, fetches at normal priority,
+ * and the response lands in the HTTP cache (`Cache-Control: immutable`).
+ * When the modal's `<img src="same-url">` renders, it's an instant cache hit.
+ *
+ * A `Set` deduplicates URLs so we never fetch the same image twice.
+ * Videos are skipped — no video variants exist, so preloading would
+ * download the full original file on cellular.
  */
-function simpleMediaPrefetch(url: string, resourceType: 'image' | 'video'): void {
-  if (typeof window === 'undefined') return;
+const preloadedUrls = new Set<string>();
 
-  const existing = document.querySelector(`link[href="${url}"]`);
-  if (!existing) {
-    const link = document.createElement('link');
-    link.rel = 'prefetch';
-    link.href = url;
-    link.as = resourceType;
-    // No crossOrigin — all media is same-origin (/api/media/...).
-    // Adding crossOrigin="anonymous" would fetch in CORS mode, creating a
-    // cache entry the subsequent <img> (no-cors mode) can't reuse.
-    document.head.appendChild(link);
-  }
+function preloadImage(url: string): void {
+  if (typeof window === 'undefined') return;
+  if (preloadedUrls.has(url)) return;
+
+  preloadedUrls.add(url);
+  const img = new Image();
+  img.src = url;
 }
 
 /**
- * Prefetch media on user interaction (hover, focus)
+ * Preload media on user interaction (hover, focus, adjacent-item prefetch).
+ * Only images are preloaded — videos are skipped to avoid downloading
+ * full original files (potentially 50 MB+) on cellular.
  */
 export function prefetchMediaOnInteraction(
   item: MediaProps,
   quality: 'thumb' | 'medium' | 'full' = 'full'
 ): void {
+  if (item.resource_type !== 'image') return;
   const url = getOptimizedMediaUrl(item.public_id, item.resource_type, quality);
-  simpleMediaPrefetch(url, item.resource_type);
+  preloadImage(url);
 }
 
 /**
