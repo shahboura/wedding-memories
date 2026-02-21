@@ -103,6 +103,17 @@ Summaries should be added to this AGENTS.md file under a "Session Summaries" sec
 
 ## Session Summaries
 
+### 2026-02-21 15:00 - Remove filmstrip scroll machinery — initial center only
+
+**Agent:** orchestrator  
+**Summary:** Removed all programmatic filmstrip scrolling after initial open. Filmstrip is now fully user-owned — native browser scroll with momentum, no JS interference, zero bounce-back.
+
+- Deleted `scrollFilmstripToIndex` (45-line manual scroll with `getBoundingClientRect`), `navigationSourceRef` (source-tracking), `thumbElements` ref map + `setThumbRef` callback, `filmstripVisible` useEffect
+- Replaced with single 15-line `useEffect` that centers filmstrip on modal open via `data-active-thumb` query, then never touches `scrollLeft` again
+- Kept `isSwipeAnimating` guard on arrow keys (genuine race condition fix, not filmstrip-related)
+- **Net change:** -102 lines (118 deleted, 16 added); `pnpm type-check` and `pnpm lint` clean
+- **Lesson:** Over-engineering scroll control creates more bugs than it solves — let the browser handle scroll
+
 ### 2026-02-21 14:30 - Filmstrip bounce-back root cause fix (Option C)
 
 **Agent:** orchestrator  

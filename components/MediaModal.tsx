@@ -53,28 +53,8 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
   const mediaContainerRef = useRef<HTMLDivElement>(null);
 
   // ── Filmstrip native scroll ──────────────────────────────────────────
-  // Scrolling updates the centered thumbnail after scroll settles.
   const filmstripRef = useRef<HTMLDivElement>(null);
   const filmstripHasScrolled = useRef(false);
-  // Map of index → button element for scrollIntoView on navigation
-  const thumbElements = useRef<Map<number, HTMLButtonElement>>(new Map());
-  // Tracks what triggered the latest navigation so the filmstrip useEffect
-  // can decide whether to scroll.  'thumbnail' = user tapped a visible
-  // thumbnail → skip scroll (finger is already there).
-  const navigationSourceRef = useRef<'thumbnail' | 'indirect'>('indirect');
-
-  // Stable ref callback — only maintains the element map, no scrolling logic.
-  // This never changes identity so React never churns refs on re-render.
-  const setThumbRef = useCallback(
-    (index: number) => (node: HTMLButtonElement | null) => {
-      if (node) {
-        thumbElements.current.set(index, node);
-      } else {
-        thumbElements.current.delete(index);
-      }
-    },
-    []
-  );
 
   // UI state
   const [controlsVisible, setControlsVisible] = useState(true);
@@ -173,92 +153,22 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
     [resetView]
   );
 
-  const scrollFilmstripToIndex = useCallback((index: number, behavior: ScrollBehavior) => {
-    const node = thumbElements.current.get(index);
-    const container = filmstripRef.current;
-    if (!node || !container) return;
-
-    // On initial open, center the active thumbnail instantly so the user
-    // starts with full context.  After that, use *minimal scroll* — only
-    // scroll enough to fully reveal the thumbnail (plus a small margin),
-    // matching native filmstrip UX (iOS Photos, Instagram Stories, etc.)
-    // where tapping a visible thumbnail doesn't yank the strip around.
-    const isInitialOpen = behavior === 'auto';
-
-    if (isInitialOpen) {
-      // Center: calculate scrollLeft so the thumbnail's midpoint aligns
-      // with the container's midpoint.
-      const thumbCenter = node.offsetLeft + node.offsetWidth / 2;
-      const targetScroll = thumbCenter - container.clientWidth / 2;
-      container.scrollLeft = targetScroll;
-      return;
-    }
-
-    // Minimal reveal: only scroll if the thumbnail is clipped or too
-    // close to an edge.  The margin ensures the thumbnail doesn't sit
-    // flush against the edge (which looks cramped).
-    const margin = 24; // px
-    const nodeRect = node.getBoundingClientRect();
-    const containerRect = container.getBoundingClientRect();
-
-    const overflowLeft = containerRect.left + margin - nodeRect.left;
-    const overflowRight = nodeRect.right - (containerRect.right - margin);
-
-    if (overflowLeft > 0) {
-      // Thumbnail is clipped on the left — scroll left by the clipped amount
-      container.scrollTo({
-        left: container.scrollLeft - overflowLeft,
-        behavior: 'smooth',
-      });
-    } else if (overflowRight > 0) {
-      // Thumbnail is clipped on the right — scroll right by the clipped amount
-      container.scrollTo({
-        left: container.scrollLeft + overflowRight,
-        behavior: 'smooth',
-      });
-    }
-    // else: fully visible — don't scroll at all
-  }, []);
-
-  // Scroll the active thumbnail into view when currentIndex changes
-  // (via swipe, arrow key, or desktop arrow button).
-  // Thumbnail taps are skipped — the user already sees what they tapped.
+  // Center the filmstrip on the active thumbnail when the modal first
+  // opens.  After that, the user owns the scroll — no JS interference.
   useEffect(() => {
     if (!isOpen) return;
+    if (filmstripHasScrolled.current) return;
+    const container = filmstripRef.current;
+    if (!container) return;
 
-    // Consume the navigation source — read and reset atomically so the
-    // next navigation starts with the default 'indirect' value.
-    const source = navigationSourceRef.current;
-    navigationSourceRef.current = 'indirect';
+    // Find the active thumbnail by data attribute
+    const activeThumb = container.querySelector<HTMLButtonElement>('[data-active-thumb="true"]');
+    if (!activeThumb) return;
 
-    // User tapped a visible thumbnail — don't scroll the filmstrip.
-    if (source === 'thumbnail') {
-      filmstripHasScrolled.current = true;
-      return undefined;
-    }
-
-    const behavior: ScrollBehavior = filmstripHasScrolled.current ? 'smooth' : 'auto';
-    if (!filmstripHasScrolled.current) {
-      const rafId = window.requestAnimationFrame(() => {
-        scrollFilmstripToIndex(currentIndex, behavior);
-      });
-      filmstripHasScrolled.current = true;
-      return () => window.cancelAnimationFrame(rafId);
-    }
-    scrollFilmstripToIndex(currentIndex, behavior);
+    const thumbCenter = activeThumb.offsetLeft + activeThumb.offsetWidth / 2;
+    container.scrollLeft = thumbCenter - container.clientWidth / 2;
     filmstripHasScrolled.current = true;
-    return undefined;
-  }, [currentIndex, isOpen, scrollFilmstripToIndex]);
-
-  // When the filmstrip unmounts (zoom > 1), reset the scroll tracking
-  // so the next mount uses an instant center instead of a smooth sweep
-  // from scrollLeft=0.
-  const filmstripVisible = zoom === 1 && controlsVisible;
-  useEffect(() => {
-    if (!filmstripVisible) {
-      filmstripHasScrolled.current = false;
-    }
-  }, [filmstripVisible]);
+  }, [currentIndex, isOpen]);
 
   // Prefetch adjacent media for faster switching.
   // Uses <link rel="prefetch"> instead of hidden <video> elements to avoid
@@ -281,7 +191,6 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
     'ArrowRight',
     () => {
       if (!isSwipeAnimating && currentIndex + 1 < items.length) {
-        navigationSourceRef.current = 'indirect';
         changeMediaIndex(currentIndex + 1);
       }
     },
@@ -292,7 +201,6 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
     'ArrowLeft',
     () => {
       if (!isSwipeAnimating && currentIndex > 0) {
-        navigationSourceRef.current = 'indirect';
         changeMediaIndex(currentIndex - 1);
       }
     },
@@ -523,7 +431,6 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
 
         // After the CSS transition finishes, swap the media and reset
         swipeTimerRef.current = setTimeout(() => {
-          navigationSourceRef.current = 'indirect';
           changeMediaIndex(targetIndex);
           setIsSwipeAnimating(false);
           setSwipeOffsetX(0);
@@ -688,10 +595,7 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
 
                 {!isTouchDevice && currentIndex > 0 && zoom === 1 && controlsVisible && (
                   <button
-                    onClick={() => {
-                      navigationSourceRef.current = 'indirect';
-                      changeMediaIndex(currentIndex - 1);
-                    }}
+                    onClick={() => changeMediaIndex(currentIndex - 1)}
                     className="absolute left-2 top-1/2 -translate-y-1/2 z-10 rounded-full bg-black/50 p-2 text-white/75 backdrop-blur-lg transition hover:bg-black/75 hover:text-white"
                     title={t('modal.previousMedia')}
                     aria-label={t('modal.previousMedia')}
@@ -705,10 +609,7 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
                   zoom === 1 &&
                   controlsVisible && (
                     <button
-                      onClick={() => {
-                        navigationSourceRef.current = 'indirect';
-                        changeMediaIndex(currentIndex + 1);
-                      }}
+                      onClick={() => changeMediaIndex(currentIndex + 1)}
                       className="absolute right-2 top-1/2 -translate-y-1/2 z-10 rounded-full bg-black/50 p-2 text-white/75 backdrop-blur-lg transition hover:bg-black/75 hover:text-white"
                       title={t('modal.nextMedia')}
                       aria-label={t('modal.nextMedia')}
@@ -754,7 +655,7 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
               </div>
             </div>
 
-            {filmstripVisible && (
+            {zoom === 1 && controlsVisible && (
               <div className="fixed inset-x-0 z-60 bottom-0 pb-[env(safe-area-inset-bottom)]">
                 <div
                   ref={filmstripRef}
@@ -772,11 +673,8 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
                     const isVideoThumb = item.resource_type === 'video';
                     return (
                       <button
-                        ref={setThumbRef(index)}
-                        onClick={() => {
-                          navigationSourceRef.current = 'thumbnail';
-                          changeMediaIndex(index);
-                        }}
+                        data-active-thumb={index === currentIndex || undefined}
+                        onClick={() => changeMediaIndex(index)}
                         key={index}
                         className={`${index === currentIndex ? 'z-20 rounded-md' : 'z-10'} ${index === 0 ? 'rounded-l-md' : ''} ${index === items.length - 1 ? 'rounded-r-md' : ''} relative inline-block w-16 md:w-20 h-16 md:h-20 shrink-0 transform-gpu overflow-hidden focus:outline-none`}
                         style={{
