@@ -19,7 +19,7 @@ Optimized for mobile wedding guests on cellular data:
 - **Streaming**: Media files are streamed via `ReadableStream`, never buffered into memory. 24h immutable cache headers.
 - **State**: Zustand with per-field selector hooks — components re-render only when their slice changes.
 
-Designed for 50–200 media items. No pagination, no video transcoding — intentional simplicity for the expected scale.
+Designed for 50–200 media items. Cursor pagination + infinite scroll; no video transcoding — intentional simplicity for the expected scale.
 
 ## Quick Start
 
