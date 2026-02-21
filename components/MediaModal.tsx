@@ -210,22 +210,31 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
     [pauseModalVideos, resetView]
   );
 
-  const scrollFilmstripToIndex = useCallback((index: number, behavior: ScrollBehavior) => {
-    const container = filmstripRef.current;
-    const node = thumbElements.current.get(index);
-    if (!container || !node) return;
+  const scrollFilmstripToIndex = useCallback(
+    (index: number, behavior: ScrollBehavior) => {
+      const container = filmstripRef.current;
+      const node = thumbElements.current.get(index);
+      if (!container || !node) return;
+      if (container.clientWidth === 0) return;
 
-    const nodeCenter = node.offsetLeft + node.offsetWidth / 2;
-    const targetLeft = nodeCenter - container.clientWidth / 2;
-    const maxLeft = container.scrollWidth - container.clientWidth;
-    const clampedLeft = Math.min(Math.max(targetLeft, 0), Math.max(maxLeft, 0));
+      const nodeCenter = node.offsetLeft + node.offsetWidth / 2;
+      const targetLeft = nodeCenter - container.clientWidth / 2;
+      const lastNode = thumbElements.current.get(items.length - 1);
+      const maxLeft = lastNode
+        ? lastNode.offsetLeft + lastNode.offsetWidth / 2 - container.clientWidth / 2
+        : container.scrollWidth - container.clientWidth;
+      const clampedLeft = Math.min(Math.max(targetLeft, 0), Math.max(maxLeft, 0));
 
-    container.scrollTo({ left: clampedLeft, behavior });
-  }, []);
+      container.scrollTo({ left: clampedLeft, behavior });
+    },
+    [items.length]
+  );
 
   const findCenteredIndex = useCallback(() => {
     const container = filmstripRef.current;
     if (!container) return null;
+    if (container.clientWidth === 0) return null;
+    if (thumbElements.current.size === 0) return null;
 
     const centerX = container.scrollLeft + container.clientWidth / 2;
     let closestIndex = 0;
@@ -245,6 +254,7 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
 
   const handleFilmstripScrollEnd = useCallback(() => {
     if (!isOpen) return;
+    if (thumbElements.current.size === 0) return;
     filmstripIsUserScrolling.current = false;
     if (filmstripScrollTimeout.current) {
       window.clearTimeout(filmstripScrollTimeout.current);
