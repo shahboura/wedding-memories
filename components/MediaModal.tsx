@@ -57,9 +57,6 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
   // Scrolling updates the centered thumbnail after scroll settles.
   const filmstripRef = useRef<HTMLDivElement>(null);
   const filmstripHasScrolled = useRef(false);
-  const filmstripIsUserScrolling = useRef(false);
-  const filmstripScrollTimeout = useRef<number | null>(null);
-  const filmstripScrollRaf = useRef<number | null>(null);
   // Map of index → button element for scrollIntoView on navigation
   const thumbElements = useRef<Map<number, HTMLButtonElement>>(new Map());
 
@@ -108,20 +105,10 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
     setPanY(0);
   }, []);
 
-  // Detect touch device and browser on mount
-  const [isSafariMobile, setIsSafariMobile] = useState(false);
-
+  // Detect touch device on mount
   useEffect(() => {
     const detectTouch = () => 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-    const detectSafariMobile = () => {
-      const ua = navigator.userAgent;
-      const isIOS = /iPad|iPhone|iPod/.test(ua);
-      const isSafari = /Safari/.test(ua) && !/Chrome|Edge|Firefox/.test(ua);
-      return isIOS && isSafari;
-    };
-
     setIsTouchDevice(detectTouch());
-    setIsSafariMobile(detectSafariMobile());
   }, []);
 
   // Ensure controls are always visible when zoomed in (safety net)
@@ -183,138 +170,42 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
     );
   }, []);
 
-  const pauseModalVideos = useCallback(() => {
-    const container = mediaContainerRef.current;
-    if (!container) return;
-    container.querySelectorAll('video').forEach((video) => {
-      if (!video.paused) {
-        video.pause();
-      }
-    });
-  }, []);
-
-  useEffect(() => {
-    if (!isOpen) {
-      pauseModalVideos();
-    }
-  }, [isOpen, pauseModalVideos]);
-
   const changeMediaIndex = useCallback(
     (newIndex: number) => {
       // Pause any currently playing video within the modal only
-      pauseModalVideos();
+      const container = mediaContainerRef.current;
+      if (container) {
+        container.querySelectorAll('video').forEach((video) => {
+          if (!video.paused) {
+            video.pause();
+          }
+        });
+      }
 
       setCurrentIndex(newIndex);
       resetView();
     },
-    [pauseModalVideos, resetView]
+    [resetView]
   );
 
-  const scrollFilmstripToIndex = useCallback(
-    (index: number, behavior: ScrollBehavior) => {
-      const container = filmstripRef.current;
-      const node = thumbElements.current.get(index);
-      if (!container || !node) return;
-      if (container.clientWidth === 0) return;
-
-      const nodeCenter = node.offsetLeft + node.offsetWidth / 2;
-      const targetLeft = nodeCenter - container.clientWidth / 2;
-      const lastNode = thumbElements.current.get(items.length - 1);
-      const maxLeft = lastNode
-        ? lastNode.offsetLeft + lastNode.offsetWidth / 2 - container.clientWidth / 2
-        : container.scrollWidth - container.clientWidth;
-      const clampedLeft = Math.min(Math.max(targetLeft, 0), Math.max(maxLeft, 0));
-
-      container.scrollTo({ left: clampedLeft, behavior });
-    },
-    [items.length]
-  );
-
-  const findCenteredIndex = useCallback(() => {
+  const scrollFilmstripToIndex = useCallback((index: number, behavior: ScrollBehavior) => {
     const container = filmstripRef.current;
-    if (!container) return null;
-    if (container.clientWidth === 0) return null;
-    if (thumbElements.current.size === 0) return null;
+    const node = thumbElements.current.get(index);
+    if (!container || !node) return;
+    if (container.clientWidth === 0) return;
 
-    const centerX = container.scrollLeft + container.clientWidth / 2;
-    let closestIndex = 0;
-    let closestDistance = Number.POSITIVE_INFINITY;
+    const nodeCenter = node.offsetLeft + node.offsetWidth / 2;
+    const targetLeft = nodeCenter - container.clientWidth / 2;
+    const maxLeft = container.scrollWidth - container.clientWidth;
+    const clampedLeft = Math.min(Math.max(targetLeft, 0), Math.max(maxLeft, 0));
 
-    thumbElements.current.forEach((node, index) => {
-      const nodeCenter = node.offsetLeft + node.offsetWidth / 2;
-      const distance = Math.abs(nodeCenter - centerX);
-      if (distance < closestDistance) {
-        closestDistance = distance;
-        closestIndex = index;
-      }
-    });
-
-    return closestIndex;
+    container.scrollTo({ left: clampedLeft, behavior });
   }, []);
-
-  const handleFilmstripScrollEnd = useCallback(() => {
-    if (!isOpen) return;
-    if (thumbElements.current.size === 0) return;
-    filmstripIsUserScrolling.current = false;
-    if (filmstripScrollTimeout.current) {
-      window.clearTimeout(filmstripScrollTimeout.current);
-      filmstripScrollTimeout.current = null;
-    }
-
-    const centeredIndex = findCenteredIndex();
-    if (centeredIndex === null) return;
-
-    if (centeredIndex !== currentIndex) {
-      changeMediaIndex(centeredIndex);
-    } else {
-      scrollFilmstripToIndex(centeredIndex, 'smooth');
-    }
-  }, [changeMediaIndex, currentIndex, findCenteredIndex, isOpen, scrollFilmstripToIndex]);
-
-  const handleFilmstripScroll = useCallback(() => {
-    if (!isOpen) return;
-    filmstripIsUserScrolling.current = true;
-
-    if (filmstripScrollTimeout.current) {
-      window.clearTimeout(filmstripScrollTimeout.current);
-    }
-
-    filmstripScrollTimeout.current = window.setTimeout(() => {
-      handleFilmstripScrollEnd();
-    }, 120);
-  }, [handleFilmstripScrollEnd, isOpen]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const container = filmstripRef.current;
-    if (!container) return;
-
-    const handleScroll = () => {
-      if (filmstripScrollRaf.current !== null) return;
-      filmstripScrollRaf.current = window.requestAnimationFrame(() => {
-        filmstripScrollRaf.current = null;
-        handleFilmstripScroll();
-      });
-    };
-
-    container.addEventListener('scroll', handleScroll, { passive: true });
-    return () => {
-      container.removeEventListener('scroll', handleScroll);
-      if (filmstripScrollTimeout.current) {
-        window.clearTimeout(filmstripScrollTimeout.current);
-        filmstripScrollTimeout.current = null;
-      }
-      if (filmstripScrollRaf.current !== null) {
-        window.cancelAnimationFrame(filmstripScrollRaf.current);
-        filmstripScrollRaf.current = null;
-      }
-    };
-  }, [handleFilmstripScroll, isOpen]);
 
   // Scroll the active thumbnail into view when currentIndex changes
   // (via swipe, arrow key, or thumbnail tap).
   useEffect(() => {
-    if (!isOpen || filmstripIsUserScrolling.current) return;
+    if (!isOpen) return;
     const behavior: ScrollBehavior = filmstripHasScrolled.current ? 'smooth' : 'auto';
     scrollFilmstripToIndex(currentIndex, behavior);
     filmstripHasScrolled.current = true;
@@ -550,15 +441,7 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
   if (!isOpen || !currentItem) return null;
 
   return (
-    <Dialog
-      open={isOpen}
-      onOpenChange={(open) => {
-        if (!open) {
-          pauseModalVideos();
-          onClose();
-        }
-      }}
-    >
+    <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogPortal>
         <DialogOverlay className="fixed inset-0 z-50 bg-black/70 backdrop-blur-2xl" />
         <DialogPrimitive.Content
@@ -742,9 +625,7 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
             </div>
 
             {zoom === 1 && controlsVisible && (
-              <div
-                className={`fixed inset-x-0 z-60 bottom-0 pb-[env(safe-area-inset-bottom)] ${isSafariMobile ? 'ios-safari-bottom' : ''}`}
-              >
+              <div className="fixed inset-x-0 z-60 bottom-0 pb-[env(safe-area-inset-bottom)]">
                 <div
                   ref={filmstripRef}
                   className="mt-0 md:mt-6 flex items-center overflow-x-auto scrollbar-hide"
