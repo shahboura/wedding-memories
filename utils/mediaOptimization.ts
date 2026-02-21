@@ -86,7 +86,9 @@ function simpleMediaPrefetch(url: string, resourceType: 'image' | 'video'): void
     link.rel = 'prefetch';
     link.href = url;
     link.as = resourceType;
-    link.crossOrigin = 'anonymous';
+    // No crossOrigin — all media is same-origin (/api/media/...).
+    // Adding crossOrigin="anonymous" would fetch in CORS mode, creating a
+    // cache entry the subsequent <img> (no-cors mode) can't reuse.
     document.head.appendChild(link);
   }
 }

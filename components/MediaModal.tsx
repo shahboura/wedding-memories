@@ -163,17 +163,23 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
     filmstripHasScrolled.current = true;
   }, [currentIndex, isOpen]);
 
-  // Prefetch adjacent media for faster switching.
-  // Uses <link rel="prefetch"> instead of hidden <video> elements to avoid
-  // DOM bloat, memory leaks, and bandwidth competition on mobile.
+  // Prefetch adjacent images for faster switching.
+  // Uses <link rel="prefetch"> (low-priority browser hint) to warm the cache
+  // for the next ±5 items.  Quality is 'full' to match what the modal displays.
+  // Videos are skipped — no video variants exist, so prefetch would download
+  // the entire original file (potentially 50MB+) on cellular.
   useEffect(() => {
     if (!isOpen) return;
 
-    if (currentIndex > 0) {
-      prefetchMediaOnInteraction(items[currentIndex - 1], 'medium');
-    }
-    if (currentIndex < items.length - 1) {
-      prefetchMediaOnInteraction(items[currentIndex + 1], 'medium');
+    for (let offset = 1; offset <= 5; offset++) {
+      const prev = currentIndex - offset;
+      const next = currentIndex + offset;
+      if (prev >= 0 && items[prev].resource_type === 'image') {
+        prefetchMediaOnInteraction(items[prev], 'full');
+      }
+      if (next < items.length && items[next].resource_type === 'image') {
+        prefetchMediaOnInteraction(items[next], 'full');
+      }
     }
   }, [currentIndex, items, isOpen]);
 
@@ -203,14 +209,16 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
   const currentItem = items[currentIndex];
   const isVideo = currentItem?.resource_type === 'video';
 
-  // Memoize media props to prevent unnecessary re-fetches
+  // Memoize media props to prevent unnecessary re-fetches.
+  // Quality is always 'full' — for videos, getOptimizedMediaProps ignores
+  // quality and hardcodes by context (no video variants exist).
   const currentMediaProps = useMemo(() => {
     if (!currentItem) return null;
     return getOptimizedMediaProps(currentItem, 'modal', {
       priority: true,
-      quality: isVideo ? 'medium' : 'full',
+      quality: 'full',
     });
-  }, [currentItem, isVideo]);
+  }, [currentItem]);
 
   // Zoom keyboard shortcuts (for images only)
   useKeypress('+', () => !isVideo && zoomIn(), { disabled: !isOpen });
