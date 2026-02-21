@@ -174,24 +174,46 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
     const container = filmstripRef.current;
     if (!node || !container) return;
 
-    // Only scroll when the thumbnail is outside (or near the edge of) the
-    // visible filmstrip area.  This prevents the "bounce-back" effect where
-    // scrollIntoView fights the user's own scroll momentum by re-centering a
-    // thumbnail that is already on-screen.
+    // On initial open, center the active thumbnail instantly so the user
+    // starts with full context.  After that, use *minimal scroll* — only
+    // scroll enough to fully reveal the thumbnail (plus a small margin),
+    // matching native filmstrip UX (iOS Photos, Instagram Stories, etc.)
+    // where tapping a visible thumbnail doesn't yank the strip around.
+    const isInitialOpen = behavior === 'auto';
+
+    if (isInitialOpen) {
+      // Center: calculate scrollLeft so the thumbnail's midpoint aligns
+      // with the container's midpoint.
+      const thumbCenter = node.offsetLeft + node.offsetWidth / 2;
+      const targetScroll = thumbCenter - container.clientWidth / 2;
+      container.scrollLeft = targetScroll;
+      return;
+    }
+
+    // Minimal reveal: only scroll if the thumbnail is clipped or too
+    // close to an edge.  The margin ensures the thumbnail doesn't sit
+    // flush against the edge (which looks cramped).
+    const margin = 24; // px
     const nodeRect = node.getBoundingClientRect();
     const containerRect = container.getBoundingClientRect();
-    const padding = 40; // px – treat thumbnails near the edge as "not visible"
-    const isVisible =
-      nodeRect.left >= containerRect.left + padding &&
-      nodeRect.right <= containerRect.right - padding;
 
-    if (!isVisible) {
-      node.scrollIntoView({
-        behavior,
-        inline: 'center',
-        block: 'nearest',
+    const overflowLeft = containerRect.left + margin - nodeRect.left;
+    const overflowRight = nodeRect.right - (containerRect.right - margin);
+
+    if (overflowLeft > 0) {
+      // Thumbnail is clipped on the left — scroll left by the clipped amount
+      container.scrollTo({
+        left: container.scrollLeft - overflowLeft,
+        behavior: 'smooth',
+      });
+    } else if (overflowRight > 0) {
+      // Thumbnail is clipped on the right — scroll right by the clipped amount
+      container.scrollTo({
+        left: container.scrollLeft + overflowRight,
+        behavior: 'smooth',
       });
     }
+    // else: fully visible — don't scroll at all
   }, []);
 
   // Scroll the active thumbnail into view when currentIndex changes
