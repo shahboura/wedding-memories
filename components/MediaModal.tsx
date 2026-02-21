@@ -118,43 +118,15 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
     }
   }, [zoom, controlsVisible]);
 
-  // Prevent browser zoom on the document when modal is open
-  // Use position:fixed scroll lock to prevent iOS Safari rubber-banding
+  // Prevent background scroll when modal is open
   useEffect(() => {
-    if (isOpen) {
-      const preventDefault = (e: Event) => {
-        if ((e as TouchEvent).touches && (e as TouchEvent).touches.length > 1) {
-          e.preventDefault();
-        }
-      };
-
-      // Save current scroll position and lock body
-      const scrollY = window.scrollY;
-      const body = document.body;
-      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
-      body.style.position = 'fixed';
-      body.style.top = `-${scrollY}px`;
-      body.style.left = '0';
-      body.style.right = '0';
-      body.style.overflow = 'hidden';
-      if (scrollbarWidth > 0) {
-        body.style.paddingRight = `${scrollbarWidth}px`;
-      }
-
-      document.addEventListener('touchstart', preventDefault, { passive: false });
-
-      return () => {
-        document.removeEventListener('touchstart', preventDefault);
-        // Restore scroll position
-        body.style.position = '';
-        body.style.top = '';
-        body.style.left = '';
-        body.style.right = '';
-        body.style.overflow = '';
-        body.style.paddingRight = '';
-        window.scrollTo(0, scrollY);
-      };
-    }
+    if (!isOpen) return;
+    const body = document.body;
+    const previousOverflow = body.style.overflow;
+    body.style.overflow = 'hidden';
+    return () => {
+      body.style.overflow = previousOverflow;
+    };
   }, [isOpen]);
 
   // Zoom functions
@@ -189,17 +161,14 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
   );
 
   const scrollFilmstripToIndex = useCallback((index: number, behavior: ScrollBehavior) => {
-    const container = filmstripRef.current;
     const node = thumbElements.current.get(index);
-    if (!container || !node) return;
-    if (container.clientWidth === 0) return;
+    if (!node) return;
 
-    const nodeCenter = node.offsetLeft + node.offsetWidth / 2;
-    const targetLeft = nodeCenter - container.clientWidth / 2;
-    const maxLeft = container.scrollWidth - container.clientWidth;
-    const clampedLeft = Math.min(Math.max(targetLeft, 0), Math.max(maxLeft, 0));
-
-    container.scrollTo({ left: clampedLeft, behavior });
+    node.scrollIntoView({
+      behavior,
+      inline: 'center',
+      block: 'nearest',
+    });
   }, []);
 
   // Scroll the active thumbnail into view when currentIndex changes
@@ -207,8 +176,16 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
   useEffect(() => {
     if (!isOpen) return;
     const behavior: ScrollBehavior = filmstripHasScrolled.current ? 'smooth' : 'auto';
+    if (!filmstripHasScrolled.current) {
+      const rafId = window.requestAnimationFrame(() => {
+        scrollFilmstripToIndex(currentIndex, behavior);
+      });
+      filmstripHasScrolled.current = true;
+      return () => window.cancelAnimationFrame(rafId);
+    }
     scrollFilmstripToIndex(currentIndex, behavior);
     filmstripHasScrolled.current = true;
+    return undefined;
   }, [currentIndex, isOpen, scrollFilmstripToIndex]);
 
   // Prefetch adjacent media for faster switching
