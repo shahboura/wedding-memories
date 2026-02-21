@@ -8,6 +8,7 @@ import { StorageAwareMedia } from './StorageAwareMedia';
 import dynamic from 'next/dynamic';
 import { getPhotosApiUrl } from '../utils/clientUtils';
 import { encodeMediaCursor, PHOTOS_PAGE_SIZE } from '../utils/pagination';
+import { isMobileDevice } from '../utils/device';
 
 const MediaModal = dynamic(() => import('./MediaModal'), { ssr: false });
 
@@ -77,6 +78,7 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
   const isLoadingMoreRef = useRef(false);
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const fetchAbortRef = useRef<AbortController | null>(null);
+  const hasInitialDataRef = useRef(initialMedia.length > 0);
   const { t, language } = useI18n();
 
   // Resolve the selected media index from the stored ID.
@@ -185,6 +187,15 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
 
   useEffect(() => {
     if (appConfig.guestIsolation && !guestName) {
+      return;
+    }
+
+    // Skip the initial mount fetch when SSR already provided data — the
+    // store was just seeded from `initialMedia` (effect above), so fetching
+    // again is a redundant network request.  On subsequent triggers (e.g.
+    // after an upload calls `refresh()`) we *do* want to refetch.
+    if (hasInitialDataRef.current) {
+      hasInitialDataRef.current = false;
       return;
     }
 
@@ -332,7 +343,9 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
             className="after:content group relative mb-5 block w-full cursor-pointer after:pointer-events-none after:absolute after:inset-0 after:rounded-lg after:shadow-highlight focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background"
             onClick={() => openModal(mediaItem.id)}
             onKeyDown={(e) => handleMediaKeyNavigation(e, mediaItem.id, openModal)}
-            onMouseEnter={() => prefetchMediaOnInteraction(mediaItem, 'medium')}
+            onMouseEnter={
+              !isMobileDevice() ? () => prefetchMediaOnInteraction(mediaItem, 'medium') : undefined
+            }
             tabIndex={0}
             aria-label={
               mediaItem.guestName && mediaItem.guestName !== 'Unknown Guest'
@@ -345,8 +358,7 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
           >
             <StorageAwareMedia
               {...optimizedMediaProps[index]}
-              className="overflow-hidden transform rounded-lg brightness-90 transition will-change-auto group-hover:brightness-110 group-focus:brightness-110"
-              style={{ transform: 'translate3d(0, 0, 0)' }}
+              className="overflow-hidden transform rounded-lg brightness-90 transition group-hover:brightness-110 group-focus:brightness-110"
             />
             {(mediaItem.guestName || mediaItem.uploadDate) && (
               <div

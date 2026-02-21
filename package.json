@@ -23,7 +23,6 @@
     "busboy": "1.6.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "framer-motion": "^12.34.3",
     "i18next": "^25.8.13",
     "lucide-react": "^0.575.0",
     "next": "^16.1.6",

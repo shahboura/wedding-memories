@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import { appConfig } from '../config';
 import { isMobileDevice } from '../utils/device';
@@ -65,6 +65,20 @@ import { formatFileSize, getCompressionInfo, getPhotosApiUrl } from '../utils/cl
 import { PHOTOS_PAGE_SIZE } from '../utils/pagination';
 import { getVideoMetadata, uploadWithXHR } from '../utils/uploadClient';
 import { useI18n } from './I18nProvider';
+
+/**
+ * Scroll to the top of the page after a delay, using 'instant' on Safari
+ * to avoid the Safari bug where smooth scroll during DOM mutations triggers
+ * a page refresh / BFCache restoration.
+ */
+const scrollToTopAfterClose = (delayMs = 350) => {
+  setTimeout(() => {
+    const isSafari =
+      typeof navigator !== 'undefined' &&
+      /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    window.scrollTo({ top: 0, behavior: isSafari ? 'instant' : 'smooth' });
+  }, delayMs);
+};
 
 /** Revoke blob/object URLs used as thumbnails to prevent memory leaks. */
 const revokeThumbnails = (filesToRevoke: UploadFile[]) => {
@@ -162,7 +176,10 @@ export const Upload = () => {
     };
   }, []);
 
-  // Auto-close the drawer/dialog after successful upload and show a toast
+  // Auto-close the drawer/dialog after successful upload and show a toast.
+  // Scroll-to-top is deferred by 350ms so the Drawer/Dialog close animation
+  // finishes first — avoids a Safari bug where smooth scroll during DOM
+  // mutations triggers a full page refresh (BFCache restoration).
   useEffect(() => {
     if (lastUploadSuccessCount > 0 && files.length === 0 && isOpen) {
       const timer = setTimeout(() => {
@@ -172,7 +189,7 @@ export const Upload = () => {
           description: t('upload.filesAddedToGallery', { count: lastUploadSuccessCount }),
         });
         setLastUploadSuccessCount(0);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        scrollToTopAfterClose();
       }, 3000);
       return () => clearTimeout(timer);
     }
@@ -661,11 +678,41 @@ export const Upload = () => {
     });
   };
 
+  const handleDrawerOpenChange = useCallback(
+    (open: boolean) => {
+      setIsOpen(open);
+      if (!open) {
+        setLastUploadSuccessCount(0);
+        setIsEditingNameMobile(false);
+        setNameError(null);
+        // Clear stale file input state on close — Safari can trigger
+        // unexpected behaviour if the input retains a previous selection
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      }
+    },
+    [setIsOpen, setLastUploadSuccessCount, setIsEditingNameMobile, setNameError]
+  );
+
+  const handleDialogOpenChange = useCallback(
+    (open: boolean) => {
+      setIsOpen(open);
+      if (!open) {
+        setLastUploadSuccessCount(0);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      }
+    },
+    [setIsOpen, setLastUploadSuccessCount]
+  );
+
   const handleViewGallery = () => {
     setIsOpen(false);
     setLastUploadSuccessCount(0);
-    // Scroll to top of page to show newly added photos
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Scroll to top after drawer/dialog close animation finishes
+    scrollToTopAfterClose();
   };
 
   const hasFiles = files.length > 0;
@@ -1025,13 +1072,7 @@ export const Upload = () => {
     // Desktop: Use Dialog
     return (
       <>
-        <Dialog
-          open={isOpen}
-          onOpenChange={(open) => {
-            setIsOpen(open);
-            if (!open) setLastUploadSuccessCount(0);
-          }}
-        >
+        <Dialog open={isOpen} onOpenChange={handleDialogOpenChange}>
           <DialogTrigger asChild>
             <TriggerButton label={t('upload.addFiles')} />
           </DialogTrigger>
@@ -1072,7 +1113,7 @@ export const Upload = () => {
               {successCount > 0 && pendingCount === 0 ? (
                 // Show "View Gallery" and "Close" when uploads are complete
                 <div className="grid grid-cols-2 gap-2 w-full">
-                  <Button variant="outline" onClick={() => setIsOpen(false)}>
+                  <Button variant="outline" onClick={() => handleDialogOpenChange(false)}>
                     {t('upload.close')}
                   </Button>
                   <Button onClick={handleViewGallery} className="bg-green-600 hover:bg-green-700">
@@ -1102,7 +1143,7 @@ export const Upload = () => {
                       <Plus className="w-5 h-5" />
                     </Button>
                   )}
-                  <Button variant="outline" onClick={() => setIsOpen(false)}>
+                  <Button variant="outline" onClick={() => handleDialogOpenChange(false)}>
                     {t('upload.close')}
                   </Button>
                   <Button
@@ -1202,14 +1243,7 @@ export const Upload = () => {
     >
       <Drawer
         open={isOpen}
-        onOpenChange={(open) => {
-          setIsOpen(open);
-          if (!open) {
-            setLastUploadSuccessCount(0);
-            setIsEditingNameMobile(false);
-            setNameError(null);
-          }
-        }}
+        onOpenChange={handleDrawerOpenChange}
         repositionInputs={false}
         shouldScaleBackground={false}
       >

@@ -13,7 +13,6 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { motion } from 'framer-motion';
 import { StorageAwareMedia } from './StorageAwareMedia';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useKeypress } from '../hooks/useKeypress';
@@ -77,6 +76,16 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
   const [controlsVisible, setControlsVisible] = useState(true);
   const [lastTapTime, setLastTapTime] = useState(0);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
+
+  // Swipe drag feedback state — tracks the horizontal offset (in px) during a
+  // swipe gesture so the content visually follows the user's finger.
+  const [swipeOffsetX, setSwipeOffsetX] = useState(0);
+  // True during the CSS transition that animates the content to its final
+  // position after the user lifts their finger.
+  const [isSwipeAnimating, setIsSwipeAnimating] = useState(false);
+  // Timer ref for the post-swipe animation timeout — allows cleanup on
+  // unmount and cancellation on rapid successive swipes.
+  const swipeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Touch tracking for distinguishing taps from swipes
   const [touchStartPos, setTouchStartPos] = useState({ x: 0, y: 0 });
@@ -188,10 +197,9 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
     return undefined;
   }, [currentIndex, isOpen, scrollFilmstripToIndex]);
 
-  // Prefetch adjacent media for faster switching
+  // Prefetch adjacent media for faster switching.
   // Uses <link rel="prefetch"> instead of hidden <video> elements to avoid
   // DOM bloat, memory leaks, and bandwidth competition on mobile.
-  // simpleMediaPrefetch() already deduplicates by checking existing link[href].
   useEffect(() => {
     if (!isOpen) return;
 
@@ -235,7 +243,6 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
 
   // Zoom keyboard shortcuts (for images only)
   useKeypress('+', () => !isVideo && zoomIn(), { disabled: !isOpen });
-  useKeypress('=', () => !isVideo && zoomIn(), { disabled: !isOpen });
   useKeypress('-', () => !isVideo && zoomOut(), { disabled: !isOpen });
   useKeypress('0', () => !isVideo && resetView(), { disabled: !isOpen });
 
@@ -396,15 +403,69 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
   );
 
   // Swipe handlers (only when not zoomed to avoid conflicts)
+  // Uses onSwiping for real-time drag feedback and onSwiped for
+  // velocity-based skip (fast flick = skip 2-5 items).
   const handlers = useSwipeable({
-    onSwipedLeft: () => {
-      if (zoom === 1 && !isPinching && currentIndex < items.length - 1) {
-        changeMediaIndex(currentIndex + 1);
+    onSwiping: (eventData) => {
+      if (zoom !== 1 || isPinching || isSwipeAnimating) return;
+      // Only track horizontal swipes (ignore mostly-vertical gestures)
+      if (Math.abs(eventData.deltaX) > Math.abs(eventData.deltaY)) {
+        let offset = eventData.deltaX;
+        // Rubber-band resistance at boundaries — finger still moves but content
+        // drags at 30% speed, signalling "nothing more in this direction".
+        const atStart = currentIndex === 0 && offset > 0;
+        const atEnd = currentIndex === items.length - 1 && offset < 0;
+        if (atStart || atEnd) {
+          offset = offset * 0.3;
+        }
+        setSwipeOffsetX(offset);
       }
     },
-    onSwipedRight: () => {
-      if (zoom === 1 && !isPinching && currentIndex > 0) {
-        changeMediaIndex(currentIndex - 1);
+    onSwiped: (eventData) => {
+      if (zoom !== 1 || isPinching || isSwipeAnimating) return;
+
+      // Determine direction: left swipe (negative deltaX) = next, right = prev
+      const isLeftSwipe = eventData.deltaX < 0;
+      const absVelocity = Math.abs(eventData.velocity);
+
+      // Skip count from velocity (capped at 5):
+      //   v < 0.5 → 1,  v 0.5-1 → 2,  v 1-1.5 → 3,  v 1.5-2 → 4,  v ≥ 2 → 5
+      const skipCount = Math.min(5, Math.floor(absVelocity * 2) + 1);
+
+      let targetIndex: number;
+      if (isLeftSwipe) {
+        targetIndex = Math.min(items.length - 1, currentIndex + skipCount);
+      } else {
+        targetIndex = Math.max(0, currentIndex - skipCount);
+      }
+
+      // Cancel any in-flight animation timer from a prior swipe
+      if (swipeTimerRef.current) {
+        clearTimeout(swipeTimerRef.current);
+        swipeTimerRef.current = null;
+      }
+
+      if (targetIndex !== currentIndex) {
+        // Animate the offset to the edge, then swap content
+        setIsSwipeAnimating(true);
+        const direction = isLeftSwipe ? -1 : 1;
+        setSwipeOffsetX(direction * window.innerWidth);
+
+        // After the CSS transition finishes, swap the media and reset
+        swipeTimerRef.current = setTimeout(() => {
+          changeMediaIndex(targetIndex);
+          setIsSwipeAnimating(false);
+          setSwipeOffsetX(0);
+          swipeTimerRef.current = null;
+        }, 200);
+      } else {
+        // Didn't move to a new item — spring back to center
+        setIsSwipeAnimating(true);
+        setSwipeOffsetX(0);
+        swipeTimerRef.current = setTimeout(() => {
+          setIsSwipeAnimating(false);
+          swipeTimerRef.current = null;
+        }, 200);
       }
     },
     delta: 35,
@@ -415,12 +476,22 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
     touchEventOptions: isTouchDevice ? { passive: false } : undefined,
   });
 
+  // Clean up swipe animation timer when modal closes or component unmounts
+  useEffect(() => {
+    if (!isOpen && swipeTimerRef.current) {
+      clearTimeout(swipeTimerRef.current);
+      swipeTimerRef.current = null;
+      setIsSwipeAnimating(false);
+      setSwipeOffsetX(0);
+    }
+  }, [isOpen]);
+
   if (!isOpen || !currentItem) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogPortal>
-        <DialogOverlay className="fixed inset-0 z-50 bg-black/70 backdrop-blur-2xl" />
+        <DialogOverlay className="fixed inset-0 z-50 bg-black/90" />
         <DialogPrimitive.Content
           className="fixed inset-0 z-50 flex items-center justify-center w-screen h-screen-dynamic p-0 border-0 bg-transparent shadow-none"
           onCloseAutoFocus={(event) => event.preventDefault()}
@@ -572,6 +643,11 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
                 <div
                   key={`${currentIndex}-${currentItem.id}`}
                   className="absolute inset-0 flex items-center justify-center"
+                  style={{
+                    transform: swipeOffsetX !== 0 ? `translateX(${swipeOffsetX}px)` : undefined,
+                    transition: isSwipeAnimating ? 'transform 200ms ease-out' : 'none',
+                    willChange: swipeOffsetX !== 0 ? 'transform' : undefined,
+                  }}
                 >
                   <div
                     className="flex items-center justify-center w-full h-full"
@@ -618,13 +694,15 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
                   {items.map((item, index) => {
                     const isVideoThumb = item.resource_type === 'video';
                     return (
-                      <motion.button
+                      <button
                         ref={setThumbRef(index)}
-                        animate={{ scale: index === currentIndex ? 1.15 : 1 }}
-                        transition={{ duration: 0.15 }}
                         onClick={() => changeMediaIndex(index)}
                         key={index}
                         className={`${index === currentIndex ? 'z-20 rounded-md' : 'z-10'} ${index === 0 ? 'rounded-l-md' : ''} ${index === items.length - 1 ? 'rounded-r-md' : ''} relative inline-block w-16 md:w-20 h-16 md:h-20 shrink-0 transform-gpu overflow-hidden focus:outline-none`}
+                        style={{
+                          transform: index === currentIndex ? 'scale(1.15)' : 'scale(1)',
+                          transition: 'transform 150ms ease-out',
+                        }}
                       >
                         {isVideoThumb ? (
                           <div
@@ -645,7 +723,7 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
                             className={`${index === currentIndex ? 'brightness-110 hover:brightness-110' : 'brightness-50 contrast-125 hover:brightness-75'} h-full transform object-cover transition`}
                           />
                         )}
-                      </motion.button>
+                      </button>
                     );
                   })}
                   {/* Trailing spacer — centers last item */}
