@@ -122,7 +122,7 @@
   "accessibility": {
     "loading": "Loading",
     "loadingNewMedia": "Loading new media",
-    "galleryUpdated": "Gallery last updated: {{time}}"
+    "galleryUpdated": "Gallery content updated"
   },
   "modal": {
     "closeModal": "Close modal (Esc)",

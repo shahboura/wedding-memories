@@ -327,7 +327,7 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
                     <p>{t('gallery.sharedBy', { name: mediaItem.guestName })}</p>
                   )}
                   {mediaItem.uploadDate && (
-                    <p className="text-white/80">
+                    <p className="text-white/80" suppressHydrationWarning>
                       {formatUploadDate(mediaItem.uploadDate, language)}
                     </p>
                   )}
@@ -346,7 +346,7 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
         aria-atomic="true"
         key={refreshCounter}
       >
-        {t('accessibility.galleryUpdated', { time: new Date().toLocaleTimeString(language) })}
+        {t('accessibility.galleryUpdated')}
       </div>
 
       <MediaModal

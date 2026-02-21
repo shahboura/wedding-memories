@@ -122,7 +122,7 @@
   "accessibility": {
     "loading": "Memuatkan",
     "loadingNewMedia": "Memuatkan media baharu",
-    "galleryUpdated": "Galeri terakhir dikemaskini: {{time}}"
+    "galleryUpdated": "Kandungan galeri dikemaskini"
   },
   "modal": {
     "closeModal": "Tutup modal (Esc)",

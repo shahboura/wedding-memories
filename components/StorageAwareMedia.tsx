@@ -62,12 +62,9 @@ export function StorageAwareMedia({
   // Resolve blur data URL from either source (Next.js convention or MediaProps)
   const resolvedBlurDataURL = blurDataURL || blurDataUrl;
 
-  const [isLoading, setIsLoading] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    // For modal context, don't show loading state initially
-    if (context === 'modal') return false;
-    return true;
-  });
+  // Start false on both server and client to avoid hydration mismatch.
+  // Gallery context activates loading state in a post-hydration effect.
+  const [isLoading, setIsLoading] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -87,6 +84,14 @@ export function StorageAwareMedia({
   useEffect(() => {
     srcRef.current = src;
   }, [src]);
+
+  // Activate loading skeleton for gallery images after hydration.
+  // Runs once on mount — the onLoad/onError handlers clear it.
+  useEffect(() => {
+    if (context !== 'modal') {
+      setIsLoading(true);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     hasRequestedLoadRef.current = false;
