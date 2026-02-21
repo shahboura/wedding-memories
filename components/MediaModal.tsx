@@ -33,6 +33,16 @@ import { getOptimizedMediaProps, prefetchMediaOnInteraction } from '../utils/med
 
 import { useI18n } from './I18nProvider';
 
+/** Calculate distance between two touch points (for pinch-to-zoom). */
+function getDistance(touches: React.TouchList): number {
+  if (touches.length < 2) return 0;
+  const touch1 = touches[0];
+  const touch2 = touches[1];
+  return Math.sqrt(
+    Math.pow(touch2.clientX - touch1.clientX, 2) + Math.pow(touch2.clientY - touch1.clientY, 2)
+  );
+}
+
 interface MediaModalProps {
   items: MediaProps[];
   isOpen: boolean;
@@ -57,7 +67,6 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
   const filmstripHasScrolled = useRef(false);
 
   // UI state
-  const [controlsVisible, setControlsVisible] = useState(true);
   const [lastTapTime, setLastTapTime] = useState(0);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
 
@@ -104,13 +113,6 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
     setIsTouchDevice(detectTouch());
   }, []);
 
-  // Ensure controls are always visible when zoomed in (safety net)
-  useEffect(() => {
-    if (zoom > 1 && !controlsVisible) {
-      setControlsVisible(true);
-    }
-  }, [zoom, controlsVisible]);
-
   // Prevent background scroll when modal is open
   useEffect(() => {
     if (!isOpen) return;
@@ -125,15 +127,6 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
   // Zoom functions
   const zoomIn = useCallback(() => setZoom((prev) => Math.min(prev * 1.5, 5)), []);
   const zoomOut = useCallback(() => setZoom((prev) => Math.max(prev / 1.5, 0.5)), []);
-  // Calculate distance between two touch points
-  const getDistance = useCallback((touches: React.TouchList) => {
-    if (touches.length < 2) return 0;
-    const touch1 = touches[0];
-    const touch2 = touches[1];
-    return Math.sqrt(
-      Math.pow(touch2.clientX - touch1.clientX, 2) + Math.pow(touch2.clientY - touch1.clientY, 2)
-    );
-  }, []);
 
   const changeMediaIndex = useCallback(
     (newIndex: number) => {
@@ -255,7 +248,7 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
         }
       }
     },
-    [isVideo, zoom, getDistance, panX, panY]
+    [isVideo, zoom, panX, panY]
   );
 
   const handleTouchMove = useCallback(
@@ -296,17 +289,7 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
         }
       }
     },
-    [
-      isVideo,
-      isPinching,
-      isDragging,
-      getDistance,
-      initialDistance,
-      initialZoom,
-      zoom,
-      dragStart,
-      touchStartPos,
-    ]
+    [isVideo, isPinching, isDragging, initialDistance, initialZoom, zoom, dragStart, touchStartPos]
   );
 
   const handleTouchEnd = useCallback(
@@ -362,23 +345,20 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
     [isVideo, isDragging, zoom, dragStart]
   );
 
-  const handleMouseUp = useCallback(() => {
+  const handleMouseUp = () => {
     setIsDragging(false);
-  }, []);
+  };
 
   // Mouse wheel handler for zoom
-  const handleWheel = useCallback(
-    (e: React.WheelEvent) => {
-      if (isVideo) return;
-      // No preventDefault needed — modal is full-screen, nothing to scroll behind it
-      if (e.deltaY < 0) {
-        zoomIn();
-      } else {
-        zoomOut();
-      }
-    },
-    [isVideo, zoomIn, zoomOut]
-  );
+  const handleWheel = (e: React.WheelEvent) => {
+    if (isVideo) return;
+    // No preventDefault needed — modal is full-screen, nothing to scroll behind it
+    if (e.deltaY < 0) {
+      zoomIn();
+    } else {
+      zoomOut();
+    }
+  };
 
   // Swipe handlers (only when not zoomed to avoid conflicts)
   // Uses onSwiping for real-time drag feedback and onSwiped for
@@ -491,7 +471,7 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
               <div
                 ref={mediaContainerRef}
                 className={`relative w-full max-w-full overflow-hidden flex items-center justify-center ${
-                  zoom === 1 && controlsVisible ? 'h-[calc(100dvh-12rem)]' : 'h-[90dvh]' // Full height when zoomed or controls hidden
+                  zoom === 1 ? 'h-[calc(100dvh-12rem)]' : 'h-[90dvh]' // Full height when zoomed
                 }`}
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
@@ -507,93 +487,87 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
                   userSelect: 'none',
                 }}
               >
-                {controlsVisible && (
-                  <div className="fixed top-2 md:top-4 right-2 md:right-5 z-20 rounded-full bg-black/50 backdrop-blur-lg p-1">
+                <div className="fixed top-2 md:top-4 right-2 md:right-5 z-20 rounded-full bg-black/50 backdrop-blur-lg p-1">
+                  <button
+                    onClick={onClose}
+                    className="rounded-full p-3 text-white/75 transition hover:bg-black/50 hover:text-white"
+                    title={t('modal.closeModal')}
+                    aria-label={t('modal.closeModal')}
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+
+                <div className="fixed top-2 md:top-4 left-2 md:left-5 z-20 flex items-center gap-1 rounded-full bg-black/50 backdrop-blur-lg p-1">
+                  <a
+                    href={currentItem.public_id}
+                    className="rounded-full p-3 text-white/75 transition hover:bg-black/50 hover:text-white"
+                    target="_blank"
+                    title={t('modal.openFullsize')}
+                    aria-label={t('modal.openFullsize')}
+                    rel="noreferrer"
+                  >
+                    <ExternalLink className="h-5 w-5" />
+                  </a>
+                  <button
+                    onClick={() => {
+                      const url = currentItem.public_id;
+                      if (!url || !/^https?:|^\//i.test(url)) {
+                        console.warn('Blocked invalid download URL', url);
+                        return;
+                      }
+                      const link = document.createElement('a');
+                      link.href = url;
+                      link.download = `wedding-photo-${currentIndex + 1}.${currentItem.format}`;
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                    }}
+                    className="rounded-full p-3 text-white/75 transition hover:bg-black/50 hover:text-white"
+                    title={t('modal.downloadFullsize')}
+                    aria-label={t('modal.downloadFullsize')}
+                  >
+                    <Download className="h-5 w-5" />
+                  </button>
+                </div>
+
+                {!isVideo && (
+                  <div className="fixed left-1/2 -translate-x-1/2 top-2 md:top-4 z-20 flex items-center gap-1 rounded-full bg-black/50 backdrop-blur-lg p-1 pointer-events-auto zoom-controls">
                     <button
-                      onClick={onClose}
-                      className="rounded-full p-3 text-white/75 transition hover:bg-black/50 hover:text-white"
-                      title={t('modal.closeModal')}
-                      aria-label={t('modal.closeModal')}
+                      onClick={zoomOut}
+                      disabled={zoom <= 0.5}
+                      className="rounded-full p-3 text-white/75 transition hover:bg-black/50 hover:text-white disabled:opacity-50"
+                      title={t('modal.zoomOut')}
+                      aria-label={t('modal.zoomOut')}
                     >
-                      <X className="h-5 w-5" />
+                      <ZoomOut className="h-5 w-5" />
                     </button>
+                    <span className="px-2 text-sm text-white/90 min-w-[3rem] text-center font-medium">
+                      {Math.round(zoom * 100)}%
+                    </span>
+                    <button
+                      onClick={zoomIn}
+                      disabled={zoom >= 5}
+                      className="rounded-full p-3 text-white/75 transition hover:bg-black/50 hover:text-white disabled:opacity-50"
+                      title={t('modal.zoomIn')}
+                      aria-label={t('modal.zoomIn')}
+                    >
+                      <ZoomIn className="h-5 w-5" />
+                    </button>
+                    {zoom !== 1 && (
+                      <button
+                        onClick={resetView}
+                        className="rounded-full p-3 text-white/75 transition hover:bg-black/50 hover:text-white ml-0.5"
+                        title={t('modal.resetZoom')}
+                        aria-label={t('modal.resetZoom')}
+                      >
+                        <RotateCcw className="h-5 w-5" />
+                      </button>
+                    )}
                   </div>
                 )}
 
-                {controlsVisible && (
-                  <>
-                    <div className="fixed top-2 md:top-4 left-2 md:left-5 z-20 flex items-center gap-1 rounded-full bg-black/50 backdrop-blur-lg p-1">
-                      <a
-                        href={currentItem.public_id}
-                        className="rounded-full p-3 text-white/75 transition hover:bg-black/50 hover:text-white"
-                        target="_blank"
-                        title={t('modal.openFullsize')}
-                        aria-label={t('modal.openFullsize')}
-                        rel="noreferrer"
-                      >
-                        <ExternalLink className="h-5 w-5" />
-                      </a>
-                      <button
-                        onClick={() => {
-                          const url = currentItem.public_id;
-                          if (!url || !/^https?:|^\//i.test(url)) {
-                            console.warn('Blocked invalid download URL', url);
-                            return;
-                          }
-                          const link = document.createElement('a');
-                          link.href = url;
-                          link.download = `wedding-photo-${currentIndex + 1}.${currentItem.format}`;
-                          document.body.appendChild(link);
-                          link.click();
-                          document.body.removeChild(link);
-                        }}
-                        className="rounded-full p-3 text-white/75 transition hover:bg-black/50 hover:text-white"
-                        title={t('modal.downloadFullsize')}
-                        aria-label={t('modal.downloadFullsize')}
-                      >
-                        <Download className="h-5 w-5" />
-                      </button>
-                    </div>
-
-                    {!isVideo && (
-                      <div className="fixed left-1/2 -translate-x-1/2 top-2 md:top-4 z-20 flex items-center gap-1 rounded-full bg-black/50 backdrop-blur-lg p-1 pointer-events-auto zoom-controls">
-                        <button
-                          onClick={zoomOut}
-                          disabled={zoom <= 0.5}
-                          className="rounded-full p-3 text-white/75 transition hover:bg-black/50 hover:text-white disabled:opacity-50"
-                          title={t('modal.zoomOut')}
-                          aria-label={t('modal.zoomOut')}
-                        >
-                          <ZoomOut className="h-5 w-5" />
-                        </button>
-                        <span className="px-2 text-sm text-white/90 min-w-[3rem] text-center font-medium">
-                          {Math.round(zoom * 100)}%
-                        </span>
-                        <button
-                          onClick={zoomIn}
-                          disabled={zoom >= 5}
-                          className="rounded-full p-3 text-white/75 transition hover:bg-black/50 hover:text-white disabled:opacity-50"
-                          title={t('modal.zoomIn')}
-                          aria-label={t('modal.zoomIn')}
-                        >
-                          <ZoomIn className="h-5 w-5" />
-                        </button>
-                        {zoom !== 1 && (
-                          <button
-                            onClick={resetView}
-                            className="rounded-full p-3 text-white/75 transition hover:bg-black/50 hover:text-white ml-0.5"
-                            title={t('modal.resetZoom')}
-                            aria-label={t('modal.resetZoom')}
-                          >
-                            <RotateCcw className="h-5 w-5" />
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </>
-                )}
-
-                {!isTouchDevice && currentIndex > 0 && zoom === 1 && controlsVisible && (
+                {!isTouchDevice && currentIndex > 0 && zoom === 1 && (
                   <button
                     onClick={() => changeMediaIndex(currentIndex - 1)}
                     className="absolute left-2 top-1/2 -translate-y-1/2 z-10 rounded-full bg-black/50 p-2 text-white/75 backdrop-blur-lg transition hover:bg-black/75 hover:text-white"
@@ -604,19 +578,16 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
                   </button>
                 )}
 
-                {!isTouchDevice &&
-                  currentIndex + 1 < items.length &&
-                  zoom === 1 &&
-                  controlsVisible && (
-                    <button
-                      onClick={() => changeMediaIndex(currentIndex + 1)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 z-10 rounded-full bg-black/50 p-2 text-white/75 backdrop-blur-lg transition hover:bg-black/75 hover:text-white"
-                      title={t('modal.nextMedia')}
-                      aria-label={t('modal.nextMedia')}
-                    >
-                      <ChevronRight className="h-6 w-6" />
-                    </button>
-                  )}
+                {!isTouchDevice && currentIndex + 1 < items.length && zoom === 1 && (
+                  <button
+                    onClick={() => changeMediaIndex(currentIndex + 1)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 z-10 rounded-full bg-black/50 p-2 text-white/75 backdrop-blur-lg transition hover:bg-black/75 hover:text-white"
+                    title={t('modal.nextMedia')}
+                    aria-label={t('modal.nextMedia')}
+                  >
+                    <ChevronRight className="h-6 w-6" />
+                  </button>
+                )}
 
                 <div
                   key={`${currentIndex}-${currentItem.id}`}
@@ -655,7 +626,7 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
               </div>
             </div>
 
-            {zoom === 1 && controlsVisible && (
+            {zoom === 1 && (
               <div className="fixed inset-x-0 z-60 bottom-0 pb-[env(safe-area-inset-bottom)]">
                 <div
                   ref={filmstripRef}

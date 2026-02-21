@@ -103,6 +103,18 @@ Summaries should be added to this AGENTS.md file under a "Session Summaries" sec
 
 ## Session Summaries
 
+### 2026-02-21 16:00 - Dead code cleanup in MediaModal
+
+**Agent:** orchestrator  
+**Summary:** Removed dead `controlsVisible` state, extracted `getDistance` as top-level function, simplified `handleMouseUp`/`handleWheel` by removing unnecessary `useCallback` wrappers.
+
+- Deleted `controlsVisible` state + `setControlsVisible` setter + safety-net useEffect (could never trigger — state was initialized `true` and never set to `false`)
+- Removed all `&& controlsVisible` JSX guards (7 occurrences) — controls are always visible, conditions were always `true`
+- Extracted `getDistance` pure math function outside component; removed from `useCallback` dependency arrays (2 lint warnings fixed)
+- Converted `handleMouseUp` (zero deps) and `handleWheel` (stable deps only) from `useCallback` to plain functions
+- Kept `WebkitOverflowScrolling: 'touch'` for backward compat with older iOS Safari — harmless no-op on modern browsers
+- **Net change:** -21 lines; `pnpm type-check` and `pnpm lint` clean (zero errors, zero warnings)
+
 ### 2026-02-21 15:00 - Remove filmstrip scroll machinery — initial center only
 
 **Agent:** orchestrator  
