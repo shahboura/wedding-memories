@@ -197,13 +197,16 @@ Summaries should be added to this AGENTS.md file under a "Session Summaries" sec
 
 ## Open Items
 
-- **H1:** `<Image unoptimized>` bypasses responsive sizing — 1080px served to 375px phones (needs sharp `srcSet`)
-- **H5:** No video compression/variants — full original video served on cellular
-- **M2:** Filesystem walk (`readdir` + `stat`) on every `/api/photos` request (needs caching)
-- **M5:** `PAGE_SIZE = 50` with no infinite scroll — all items load at once
-- **M6:** No service worker or offline caching
-- **O3:** Duplicate `/api/photos` URL construction in Upload.tsx and MediaGallery.tsx
-- **H2:** Download URL not validated against `javascript:` scheme in MediaModal
+- **H5:** No video compression/variants — full original video served on cellular (needs ffmpeg pipeline; mitigated by `preload="none"` + Range requests)
+- **M6:** No service worker or offline caching (low priority — browser HTTP cache with 24h max-age covers the single-event use case)
+
+### Closed Items (2026-02-21)
+
+- ~~H1~~ Gallery bandwidth: **Fixed** — mobile gallery serves `thumb` (400w, 25-45KB) instead of `medium` (1080w). Modal correctly serves `full` for pinch-to-zoom (up to 5x).
+- ~~M2~~ API caching: **Deprioritized** — ISR `revalidate=60` + `hasInitialDataRef` already eliminates most filesystem walks.
+- ~~M5~~ No infinite scroll: **Already implemented** — IntersectionObserver with 600px rootMargin + cursor-based pagination in `MediaGallery.tsx`.
+- ~~H2~~ Download URL validation: **Already implemented** — download handler has `/^https?:|^\//i` allowlist; `public_id` is always server-generated `/api/media/...`.
+- ~~O3~~ Duplicate URL construction: **Already fixed** — centralized in `getPhotosApiUrl()` from `utils/clientUtils.ts`.
 
 ### Session Summary - Sun Dec 21 2025
 
