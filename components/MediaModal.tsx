@@ -660,6 +660,8 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
                 <div
                   ref={filmstripRef}
                   className="mt-0 md:mt-6 flex items-center overflow-x-auto scrollbar-hide"
+                  onTouchStartCapture={(e) => e.stopPropagation()}
+                  onTouchMoveCapture={(e) => e.stopPropagation()}
                   style={{
                     WebkitOverflowScrolling: 'touch',
                     scrollbarWidth: 'none',
