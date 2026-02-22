@@ -105,7 +105,7 @@ function preloadImage(url: string): void {
  */
 export function prefetchMediaOnInteraction(
   item: MediaProps,
-  quality: 'thumb' | 'medium' | 'full' = 'full'
+  quality: 'thumb' | 'medium' | 'full' = 'medium'
 ): void {
   if (item.resource_type !== 'image') return;
   const url = getOptimizedMediaUrl(item.public_id, item.resource_type, quality);
@@ -130,14 +130,11 @@ export function getOptimizedMediaProps(
   const { priority = false, quality = defaultQuality } = options;
 
   if (item.resource_type === 'video') {
-    // Videos use direct URLs since we don't generate video variants yet.
-    // Video thumbnails in the modal filmstrip are rendered as static
-    // placeholders (gradient + play icon) — they never reach this function.
-    const videoSrc = getOptimizedMediaUrl(
-      item.public_id,
-      item.resource_type,
-      context === 'gallery' ? 'medium' : 'full'
-    );
+    // Videos use direct URLs — no video variants exist, so quality param
+    // is ignored by getOptimizedMediaUrl (always returns publicId as-is).
+    // The quality arg below is cosmetic; if video variants are ever added,
+    // this should be revisited to match the image 'medium' policy.
+    const videoSrc = getOptimizedMediaUrl(item.public_id, item.resource_type, 'medium');
 
     return {
       src: videoSrc,

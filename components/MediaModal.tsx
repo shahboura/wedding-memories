@@ -43,6 +43,12 @@ function getDistance(touches: React.TouchList): number {
   );
 }
 
+// Zoom limits — capped at 3× because 'medium' variant (1080w) stays sharp
+// up to ~3× on mobile (1080 ÷ 360px viewport ≈ 3). Users can tap the
+// "open full-size" button for pixel-perfect originals beyond this range.
+const MAX_ZOOM = 3;
+const MIN_ZOOM = 0.5;
+
 interface MediaModalProps {
   items: MediaProps[];
   isOpen: boolean;
@@ -125,8 +131,10 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
   }, [isOpen]);
 
   // Zoom functions
-  const zoomIn = useCallback(() => setZoom((prev) => Math.min(prev * 1.5, 5)), []);
-  const zoomOut = useCallback(() => setZoom((prev) => Math.max(prev / 1.5, 0.5)), []);
+  // Capped at MAX_ZOOM — 'medium' variant (1080w) stays sharp up to ~3× on mobile.
+  // Users can tap ↗️ "open full-size" for the original at any zoom.
+  const zoomIn = useCallback(() => setZoom((prev) => Math.min(prev * 1.5, MAX_ZOOM)), []);
+  const zoomOut = useCallback(() => setZoom((prev) => Math.max(prev / 1.5, MIN_ZOOM)), []);
 
   const changeMediaIndex = useCallback(
     (newIndex: number) => {
@@ -165,19 +173,19 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
 
   // Preload adjacent images for instant switching.
   // Uses `new Image().src` (works on all browsers including Safari, which
-  // ignores `<link rel="prefetch">` entirely).  Limited to ±2 to avoid
-  // speculatively downloading 30 MB+ of full-quality originals on cellular.
+  // ignores `<link rel="prefetch">` entirely).  ±5 is safe at 'medium'
+  // quality (~150-250 KB each ≈ 2.5 MB total, less than one 'full' original).
   useEffect(() => {
     if (!isOpen) return;
 
-    for (let offset = 1; offset <= 2; offset++) {
+    for (let offset = 1; offset <= 5; offset++) {
       const prev = currentIndex - offset;
       const next = currentIndex + offset;
       if (prev >= 0) {
-        prefetchMediaOnInteraction(items[prev], 'full');
+        prefetchMediaOnInteraction(items[prev], 'medium');
       }
       if (next < items.length) {
-        prefetchMediaOnInteraction(items[next], 'full');
+        prefetchMediaOnInteraction(items[next], 'medium');
       }
     }
   }, [currentIndex, items, isOpen]);
@@ -209,13 +217,15 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
   const isVideo = currentItem?.resource_type === 'video';
 
   // Memoize media props to prevent unnecessary re-fetches.
-  // Quality is always 'full' — for videos, getOptimizedMediaProps ignores
-  // quality and hardcodes by context (no video variants exist).
+  // Display uses 'medium' (1080w WebP, ~150-250 KB) for fast load on cellular.
+  // Download/open-fullsize buttons use currentItem.public_id (original file)
+  // independently — no quality change affects them.
+  // For videos, getOptimizedMediaProps ignores quality (no video variants exist).
   const currentMediaProps = useMemo(() => {
     if (!currentItem) return null;
     return getOptimizedMediaProps(currentItem, 'modal', {
       priority: true,
-      quality: 'full',
+      quality: 'medium',
     });
   }, [currentItem]);
 
@@ -279,7 +289,7 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
         const currentDistance = getDistance(e.touches);
         if (initialDistance > 0) {
           const scale = currentDistance / initialDistance;
-          const newZoom = Math.max(0.5, Math.min(5, initialZoom * scale));
+          const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, initialZoom * scale));
           setZoom(newZoom);
         }
         if (e.cancelable) {
@@ -316,6 +326,7 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
           const now = Date.now();
           if (now - lastTapTime < 300) {
             // Double tap detected - zoom from center
+            // 2× is intentional — comfortable preview level, not MAX_ZOOM
             if (zoom === 1) {
               setPanX(0);
               setPanY(0);
@@ -542,7 +553,7 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
                   <div className="fixed left-1/2 -translate-x-1/2 top-2 md:top-4 z-20 flex items-center gap-1 rounded-full bg-black/50 backdrop-blur-lg p-1 pointer-events-auto zoom-controls">
                     <button
                       onClick={zoomOut}
-                      disabled={zoom <= 0.5}
+                      disabled={zoom <= MIN_ZOOM}
                       className="rounded-full p-3 text-white/75 transition hover:bg-black/50 hover:text-white disabled:opacity-50"
                       title={t('modal.zoomOut')}
                       aria-label={t('modal.zoomOut')}
@@ -554,7 +565,7 @@ export function MediaModal({ items, isOpen, initialIndex, onClose }: MediaModalP
                     </span>
                     <button
                       onClick={zoomIn}
-                      disabled={zoom >= 5}
+                      disabled={zoom >= MAX_ZOOM}
                       className="rounded-full p-3 text-white/75 transition hover:bg-black/50 hover:text-white disabled:opacity-50"
                       title={t('modal.zoomIn')}
                       aria-label={t('modal.zoomIn')}
