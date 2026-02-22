@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { EVENT_TOKEN_COOKIE, isEventTokenRequired } from './utils/eventToken';
 
-const PUBLIC_PATHS = ['/event', '/event/access', '/_next', '/favicon.ico'];
+const PUBLIC_PATHS = ['/event', '/event/access', '/_next', '/favicon.ico', '/apple-touch-icon.png'];
 
 export function proxy(request: NextRequest): NextResponse {
   if (!isEventTokenRequired()) {
