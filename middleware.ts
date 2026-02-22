@@ -3,7 +3,7 @@ import { EVENT_TOKEN_COOKIE, isEventTokenRequired } from './utils/eventToken';
 
 const PUBLIC_PATHS = ['/event', '/event/access', '/_next', '/favicon.ico'];
 
-export function proxy(request: NextRequest): NextResponse {
+export function middleware(request: NextRequest): NextResponse {
   if (!isEventTokenRequired()) {
     return NextResponse.next();
   }
