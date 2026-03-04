@@ -4,6 +4,19 @@ import sharp from 'sharp';
 import { StorageService, UploadMetadata, UploadResult, UploadSource } from './StorageService';
 import type { MediaProps } from '../utils/types';
 
+/**
+ * Produces a stable positive integer from a string (djb2 hash).
+ * Used to generate deterministic IDs from file paths so that IDs
+ * don't shift when items are added or removed.
+ */
+function stableNumericHash(str: string): number {
+  let hash = 5381;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash * 33) ^ str.charCodeAt(i);
+  }
+  return hash >>> 0; // ensure unsigned 32-bit
+}
+
 /** File extensions recognized as uploadable/servable media. */
 const MEDIA_EXTENSIONS = new Set([
   'jpg',
@@ -189,9 +202,10 @@ export class LocalStorageService implements StorageService {
       return dateB - dateA;
     });
 
-    // Reassign sequential IDs after sorting
-    mediaItems.forEach((item, index) => {
-      item.id = index;
+    // Assign stable IDs derived from each file's public_id (API URL path).
+    // Unlike sequential indices, these don't shift when items are added/removed.
+    mediaItems.forEach((item) => {
+      item.id = stableNumericHash(item.public_id);
     });
 
     return mediaItems;
