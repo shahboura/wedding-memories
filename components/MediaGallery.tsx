@@ -200,26 +200,48 @@ export function MediaGallery({ initialMedia }: MediaGalleryProps) {
     const target = loadMoreRef.current;
     if (!target) return;
 
+    const SCROLL_LOOKAHEAD_PX = 600;
+    const PAGINATION_COOLDOWN_MS = 200;
+    let cooldownTimer: ReturnType<typeof setTimeout> | null = null;
+    let disposed = false;
+
+    const loadNextPage = () => {
+      if (disposed || isLoadingMoreRef.current || !hasMoreRef.current) return;
+      const rect = target.getBoundingClientRect();
+      if (rect.top > window.innerHeight + SCROLL_LOOKAHEAD_PX) return;
+      isLoadingMoreRef.current = true;
+      fetchMediaPage({
+        showLoading: false,
+        cursor: paginationCursorRef.current,
+        append: true,
+      })
+        .then((items) => {
+          if (disposed || items.length === 0 || !hasMoreRef.current) return;
+          // IntersectionObserver won't re-fire when the sentinel stays
+          // continuously intersecting (no threshold transition), so we
+          // schedule the next page with a cooldown to prevent tight loops.
+          cooldownTimer = setTimeout(loadNextPage, PAGINATION_COOLDOWN_MS);
+        })
+        .finally(() => {
+          isLoadingMoreRef.current = false;
+        });
+    };
+
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (!entry.isIntersecting) return;
-        if (isLoadingMoreRef.current || !hasMoreRef.current) return;
-        if (isLoading) return;
-        isLoadingMoreRef.current = true;
-        fetchMediaPage({
-          showLoading: false,
-          cursor: paginationCursorRef.current,
-          append: true,
-        }).finally(() => {
-          isLoadingMoreRef.current = false;
-        });
+        loadNextPage();
       },
-      { rootMargin: '600px' }
+      { rootMargin: `${SCROLL_LOOKAHEAD_PX}px` }
     );
 
     observer.observe(target);
-    return () => observer.disconnect();
-  }, [fetchMediaPage, isLoading]);
+    return () => {
+      disposed = true;
+      observer.disconnect();
+      if (cooldownTimer) clearTimeout(cooldownTimer);
+    };
+  }, [fetchMediaPage]);
 
   // Pre-compute optimized props for all gallery items to avoid re-calling
   // getOptimizedMediaProps on every render cycle

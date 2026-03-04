@@ -31,7 +31,13 @@ const useAppStore = create<AppState>()(
 
       media: [],
       setMedia: (media: MediaProps[]) => set({ media }),
-      appendMedia: (media: MediaProps[]) => set((state) => ({ media: [...state.media, ...media] })),
+      appendMedia: (newItems: MediaProps[]) =>
+        set((state) => {
+          const existingIds = new Set(state.media.map((m) => m.id));
+          const unique = newItems.filter((m) => !existingIds.has(m.id));
+          if (unique.length === 0) return state;
+          return { media: [...state.media, ...unique] };
+        }),
 
       isMediaModalOpen: false,
       selectedMediaId: null,
