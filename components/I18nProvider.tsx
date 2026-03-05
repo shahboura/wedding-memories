@@ -50,15 +50,14 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Memoize t so consumers don't re-render unless the language actually changes.
-  // language is intentionally in deps — i18n.t reads from the singleton, but we need
-  // a new function reference when language changes to trigger consumer re-renders.
-  /* eslint-disable react-hooks/exhaustive-deps */
+  // Pass lng explicitly so t() always uses the React-managed language state
+  // rather than the mutable singleton's current language. This prevents hydration
+  // mismatches when the useEffect above mutates the singleton before children hydrate.
   const t = useCallback(
-    (key: string, options?: Record<string, unknown>): string => i18n.t(key, options) as string,
+    (key: string, options?: Record<string, unknown>): string =>
+      i18n.t(key, { ...options, lng: language }) as string,
     [language]
   );
-  /* eslint-enable react-hooks/exhaustive-deps */
 
   const contextValue = useMemo<I18nContextType>(
     () => ({ language, setLanguage, t, isLoading }),
