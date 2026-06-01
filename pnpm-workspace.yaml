@@ -1,0 +1,6 @@
+# pnpm v11 project configuration (settings formerly in package.json "pnpm" field)
+# https://pnpm.io/settings
+
+allowBuilds:
+  sharp: true
+  unrs-resolver: true

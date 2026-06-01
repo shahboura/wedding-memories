@@ -7,8 +7,8 @@ RUN npm install -g pnpm
 
 WORKDIR /app
 
-# Copy only package manifests for layer caching
-COPY package.json pnpm-lock.yaml ./
+# Copy only package manifests and config for layer caching
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
 RUN pnpm install --frozen-lockfile --prod=false
 

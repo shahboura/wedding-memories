@@ -103,6 +103,19 @@ Summaries should be added to this AGENTS.md file under a "Session Summaries" sec
 
 ## Session Summaries
 
+### 2026-06-01 16:51 - Update all packages to latest + Docker build
+
+**Agent:** orchestrator
+**Summary:** Updated all 21 runtime + 12 dev dependencies to latest; fixed TS 6.0 `baseUrl` deprecation; pinned ESLint to 9.x (ecosystem plugins don't support v10); configured pnpm v11 `allowBuilds`; built Docker image successfully (292MB).
+
+- **Package bumps:** React 19.2.6, Next.js 16.2.6, TypeScript 6.0.3, Tailwind 4.3.0, ESLint 9.39.4, lucide-react 1.17.0, i18next 26.3.0, react-i18next 17.0.8, sharp 0.34.5, zustand 5.0.14, prettier 3.8.3
+- **TS 6.0 fix:** Removed deprecated `baseUrl: "."` — `paths` now resolves from tsconfig dir by default; `"@/*": ["./*"]` unchanged. Clean type-check.
+- **ESLint:** Pinned to `^9.39.4` (latest v9) — `eslint-plugin-react@7.37.5` peer deps only support `eslint ^3-9`. ESLint 10 ecosystem not ready.
+- **pnpm v11:** Created `pnpm-workspace.yaml` with `allowBuilds: { sharp: true, unrs-resolver: true }` — replaces removed `onlyBuiltDependencies`. Updated Dockerfile to copy this file in deps stage.
+- **Docker:** `docker compose build` passed all 3 stages (deps → builder → runner); `wedding-memories:latest` (292MB).
+- **Files changed:** `package.json`, `tsconfig.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml` (new), `Dockerfile`
+- **Lesson:** pnpm v11 deprecates the `pnpm` field in `package.json` — use `pnpm-workspace.yaml` for all project config; also removed `onlyBuiltDependencies` in favor of `allowBuilds`.
+
 ### 2026-02-21 16:00 - Dead code cleanup in MediaModal
 
 **Agent:** orchestrator  
