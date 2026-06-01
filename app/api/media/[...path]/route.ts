@@ -4,6 +4,7 @@ import { createReadStream } from 'fs';
 import * as path from 'path';
 import type { Readable } from 'stream';
 import { isEventTokenRequired, isEventTokenValid } from '../../../../utils/eventToken';
+import { storage } from '../../../../storage';
 
 export const runtime = 'nodejs';
 
@@ -92,15 +93,32 @@ export async function GET(
     return NextResponse.json({ error: 'Invalid path' }, { status: 400 });
   }
 
-  // Check file exists and get size for Content-Length
-  let fileSize: number;
+  // Check file exists and get size for Content-Length.
+  // When a thumb/medium WebP variant is missing, try on-demand regeneration
+  // from the original file before falling back to 404.
+  let fileSize = 0;
+  let fileFound = false;
   try {
     const stat = await fs.stat(resolvedFile);
     if (!stat.isFile()) {
       return NextResponse.json({ error: 'Not a file' }, { status: 404 });
     }
     fileSize = stat.size;
+    fileFound = true;
   } catch {
+    const missingExt = path.extname(resolvedFile).toLowerCase();
+    const parentDir = path.basename(path.dirname(resolvedFile));
+    if (missingExt === '.webp' && (parentDir === 'thumb' || parentDir === 'medium')) {
+      const regenerated = await storage.ensureImageVariant(resolvedFile);
+      if (regenerated) {
+        const stat = await fs.stat(regenerated);
+        fileSize = stat.size;
+        fileFound = true;
+      }
+    }
+  }
+
+  if (!fileFound) {
     return NextResponse.json({ error: 'File not found' }, { status: 404 });
   }
 

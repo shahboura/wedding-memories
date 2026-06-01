@@ -103,6 +103,19 @@ Summaries should be added to this AGENTS.md file under a "Session Summaries" sec
 
 ## Session Summaries
 
+### 2026-06-01 17:15 - On-demand variant regeneration (lazy sharp)
+
+**Agent:** orchestrator
+**Summary:** Added transparent on-demand regeneration of missing thumb/medium WebP variants via the media serving route. Deleting variant or meta files no longer breaks the gallery — the first request regenerates them from the original.
+
+- **Problem:** `getOptimizedMediaProps` always constructs thumb/medium URLs without checking file existence. Deleting `thumb/` or `medium/` directories caused 404s with no fallback (by design, to protect bandwidth). Meta files degraded gracefully (default dimensions, no blur), but variants were critical.
+- **Fix:** Added `LocalStorageService.ensureImageVariant(absolutePath)` — walks up from variant path to find the original file, then delegates to existing `generateImageAssets()` (same sharp pipeline as uploads). Safe for concurrent requests via `Map<string, Promise>` lock. Generates both thumb + medium in one pass so both variants are ready after the first regeneration. `generateImageAssets` now also writes the meta JSON when `originalFormat` is provided, eliminating the separate meta write in both `uploadFromPath` and the regeneration path.
+- **Route change:** `GET /api/media/[...path]` now calls `ensureImageVariant()` in the 404 catch before returning 404 — transparent to all clients.
+- **Files changed:** `storage/LocalStorageService.ts` (+95 lines), `app/api/media/[...path]/route.ts` (+17/-4 lines)
+- **Follow-up fix:** Added `@eaDir` to `walkDirectory()` skip list — Synology NAS creates hidden metadata directories that were being picked up as media items, creating ghost gallery entries and spurious 404s.
+- **Verification:** `pnpm type-check` and `pnpm lint` clean (zero errors, zero warnings), Docker build passes
+- **Lesson:** A small deterministic URL transform without existence checking creates a hard dependency on generated artifacts. Lazy regeneration at the serving layer is the lowest-friction fix — no API changes, no client changes, no data migration.
+
 ### 2026-06-01 16:51 - Update all packages to latest + Docker build
 
 **Agent:** orchestrator

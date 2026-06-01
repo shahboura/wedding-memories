@@ -44,6 +44,8 @@ const MEDIA_EXTENSIONS = new Set([
  */
 export class LocalStorageService implements StorageService {
   private readonly basePath: string;
+  /** Prevents concurrent sharp runs for the same missing variant. */
+  private readonly regenerationLocks = new Map<string, Promise<void>>();
 
   constructor() {
     this.basePath = process.env.LOCAL_STORAGE_PATH || '/app/uploads';
@@ -82,7 +84,8 @@ export class LocalStorageService implements StorageService {
   private async generateImageAssets(
     buffer: Buffer,
     absoluteDir: string,
-    baseName: string
+    baseName: string,
+    originalFormat?: string
   ): Promise<{ width: number; height: number; blurDataUrl: string }> {
     const image = sharp(buffer).rotate();
     const metadata = await image.metadata();
@@ -109,7 +112,102 @@ export class LocalStorageService implements StorageService {
     const blurBuffer = await image.clone().resize(8).jpeg({ quality: 60 }).toBuffer();
     const blurDataUrl = `data:image/jpeg;base64,${blurBuffer.toString('base64')}`;
 
+    // Write meta JSON when the original format is known (always during upload,
+    // optionally during on-demand regeneration).
+    if (originalFormat) {
+      const metaPath = this.getMetaPath(absoluteDir, baseName);
+      await this.ensureDir(path.dirname(metaPath));
+      await fs.writeFile(
+        metaPath,
+        JSON.stringify({ width, height, blurDataUrl, format: originalFormat }, null, 2)
+      );
+    }
+
     return { width, height, blurDataUrl };
+  }
+
+  /**
+   * Ensures a thumb or medium image variant exists on disk, regenerating it
+   * from the original file when missing.  Safe for concurrent requests —
+   * only one sharp pass runs per file; other callers wait on the same promise.
+   *
+   * @returns The absolute path if the variant exists (or was regenerated),
+   *          or `null` when the original file cannot be found.
+   */
+  async ensureImageVariant(absolutePath: string): Promise<string | null> {
+    // Fast path — already on disk
+    try {
+      await fs.access(absolutePath);
+      return absolutePath;
+    } catch {
+      // Not found — try regeneration below
+    }
+
+    // Only handle *.webp files inside a thumb/ or medium/ directory
+    const variantDir = path.dirname(absolutePath);
+    const variantType = path.basename(variantDir);
+    if (variantType !== 'thumb' && variantType !== 'medium') return null;
+    if (path.extname(absolutePath).toLowerCase() !== '.webp') return null;
+
+    const baseName = path.basename(absolutePath, '.webp');
+    const guestDir = path.dirname(variantDir);
+
+    // Locate the original file (any common image extension)
+    const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+    let originalPath = '';
+    let originalExt = '';
+    for (const ext of IMAGE_EXTENSIONS) {
+      const candidate = path.join(guestDir, `${baseName}.${ext}`);
+      try {
+        await fs.access(candidate);
+        originalPath = candidate;
+        originalExt = ext;
+        break;
+      } catch {
+        // Try next extension
+      }
+    }
+    if (!originalPath) return null;
+
+    // Concurrency: if another request is already regenerating this file,
+    // wait for it instead of starting a duplicate sharp pipeline.
+    const lockKey = absolutePath;
+    const inFlight = this.regenerationLocks.get(lockKey);
+    if (inFlight) {
+      await inFlight; // never rejects — errors are swallowed inside the lock
+      try {
+        await fs.access(absolutePath);
+        return absolutePath;
+      } catch {
+        return null;
+      }
+    }
+
+    const lockPromise = (async () => {
+      try {
+        const buffer = await fs.readFile(originalPath);
+        // Reuses the same generateImageAssets pipeline as uploads — generates
+        // both thumb + medium variants and the meta JSON in one pass.  More
+        // than we strictly need for one missing variant, but the cost is
+        // negligible (~50-200ms) and both variants are ready for future requests.
+        await this.generateImageAssets(buffer, guestDir, baseName, originalExt);
+      } catch {
+        // Sharp may fail on corrupt images — leave no lock behind and let
+        // the caller return 404.
+      } finally {
+        this.regenerationLocks.delete(lockKey);
+      }
+    })();
+
+    this.regenerationLocks.set(lockKey, lockPromise);
+    await lockPromise;
+
+    try {
+      await fs.access(absolutePath);
+      return absolutePath;
+    } catch {
+      return null;
+    }
   }
 
   /**
@@ -148,18 +246,19 @@ export class LocalStorageService implements StorageService {
 
     if (source.mimeType.startsWith('image/')) {
       const buffer = await fs.readFile(absolutePath);
-      const result = await this.generateImageAssets(buffer, absoluteDir, baseName);
+      const result = await this.generateImageAssets(buffer, absoluteDir, baseName, fileExtension);
       width = result.width;
       height = result.height;
       blurDataUrl = result.blurDataUrl;
+    } else {
+      // Videos — write a minimal meta file so walkDirectory() picks up dimensions
+      const metaPath = this.getMetaPath(absoluteDir, baseName);
+      await this.ensureDir(path.dirname(metaPath));
+      await fs.writeFile(
+        metaPath,
+        JSON.stringify({ width, height, blurDataUrl, format: fileExtension }, null, 2)
+      );
     }
-
-    const metaPath = this.getMetaPath(absoluteDir, baseName);
-    await this.ensureDir(path.dirname(metaPath));
-    await fs.writeFile(
-      metaPath,
-      JSON.stringify({ width, height, blurDataUrl, format: fileExtension }, null, 2)
-    );
 
     const mediaUrl = this.getMediaUrl(relativePath);
 
@@ -241,7 +340,8 @@ export class LocalStorageService implements StorageService {
         if (
           normalizedPath.includes('/thumb/') ||
           normalizedPath.includes('/medium/') ||
-          normalizedPath.includes('/meta/')
+          normalizedPath.includes('/meta/') ||
+          normalizedPath.includes('/@eadir/')
         ) {
           continue;
         }
