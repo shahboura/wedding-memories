@@ -1,7 +1,7 @@
 # ============================================================
 # Stage 1: Install dependencies
 # ============================================================
-FROM node:25-alpine AS deps
+FROM node:lts-alpine AS deps
 
 RUN npm install -g pnpm
 
@@ -15,7 +15,7 @@ RUN pnpm install --frozen-lockfile --prod=false
 # ============================================================
 # Stage 2: Build the Next.js application
 # ============================================================
-FROM node:25-alpine AS builder
+FROM node:lts-alpine AS builder
 
 # Build arguments — NEXT_PUBLIC_* vars are inlined into the JS bundle
 # by Next.js at build time, so they work on both server and client.
@@ -51,7 +51,7 @@ RUN pnpm build
 # ============================================================
 # Stage 3: Production runtime
 # ============================================================
-FROM node:25-alpine AS runner
+FROM node:lts-alpine AS runner
 
 WORKDIR /app
 
