@@ -103,6 +103,19 @@ Summaries should be added to this AGENTS.md file under a "Session Summaries" sec
 
 ## Session Summaries
 
+### 2026-09-18 - Storage hardening, quarantine fix, i18n, deps update
+
+**Agent:** orchestrator
+**Summary:** Reviewed commit `14df988`, hardened on-demand variant regeneration, fixed a quarantine data-exposure bug, translated the event-access screen, and updated all semver-compatible packages. Delivered on branch `fix/storage-hardening-and-deps`.
+
+- **Commit review (`14df988`):** kept on-demand variant regeneration, but fixed a concurrency hole — the lock was keyed per-variant, so concurrent `thumb` + `medium` requests raced to write the same files; it is now keyed on the original file. Also fixed a root-level `@eaDir` skip gap and added observability (`console.warn` on success, `console.error` on failure). Tagged runtime storage paths with `/*turbopackIgnore: true*/`, which eliminated 4 Turbopack warnings and stopped the whole project (source, `.git`, docs, configs) from being traced into the standalone output.
+- **Quarantine exposure (new bug):** rejected uploads (failed magic-byte validation) are written to `{LOCAL_STORAGE_PATH}/quarantine/`, which `walkDirectory()` never skipped. They appeared in the gallery as a "quarantine" guest and were publicly downloadable via `/api/media/quarantine/...`; `?guest=quarantine` also bypassed the root filter. Now excluded from listing (dir-level skip + `startsWith('quarantine/')`) and refused with 404 in the media route. Not a token bypass — every API route still enforces the event token; it was an authorization-scope bug.
+- **Negative cache:** regeneration failures short-circuit for `REGENERATION_FAILURE_TTL_MS` (5 min) so a corrupt/deleted original does not retry sharp + log on every request.
+- **i18n:** added the `eventAccess` namespace to en/ms and routed the event-access page and form through `useI18n`; also fixed `isSubmitting` never resetting when `window.location.assign` throws.
+- **Deps:** updated 26 packages in-range. Held TypeScript 7 (typescript-eslint rejects TS 7.0) and ESLint 10 (eslint-plugin-react crashes); `@types/node` kept on 25.x.
+- **Verification:** type-check clean, lint clean (0/0), build clean (0 warnings), integration + concurrency tests passed, Docker image builds (292 MB) and `/api/health` returns ok.
+- **Lesson:** a lock key must identify the contended resource (the original file), not one of its derived artifacts (the variant). Generated artifacts that live under the served root also need explicit exclusion from listing and serving.
+
 ### 2026-06-01 17:15 - On-demand variant regeneration (lazy sharp)
 
 **Agent:** orchestrator
