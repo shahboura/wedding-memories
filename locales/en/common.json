@@ -171,5 +171,14 @@
     "title": "404 - Page Not Found",
     "description": "The page you're looking for doesn't exist.",
     "goHome": "Go Home"
+  },
+  "eventAccess": {
+    "required": "Event access required",
+    "description": "Please scan the event QR code or open the event link to access the gallery.",
+    "tokenPlaceholder": "Enter event token",
+    "tokenRequired": "Please enter the event token.",
+    "unlock": "Unlock gallery",
+    "checking": "Checking…",
+    "navigationFailed": "Could not open the gallery. Please try again."
   }
 }
