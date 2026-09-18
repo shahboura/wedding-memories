@@ -83,13 +83,23 @@ export async function GET(
     return NextResponse.json({ error: 'Invalid path' }, { status: 400 });
   }
 
-  const basePath = process.env.LOCAL_STORAGE_PATH || '/app/uploads';
-  const filePath = path.join(basePath, ...pathSegments);
+  // Security: quarantined files are untrusted (they failed content validation)
+  // and must never be served through the public media route.
+  const normalizedJoined = joinedPath.toLowerCase();
+  if (normalizedJoined === 'quarantine' || normalizedJoined.startsWith('quarantine/')) {
+    return NextResponse.json({ error: 'File not found' }, { status: 404 });
+  }
 
-  // Security: ensure resolved path is still within basePath
-  const resolvedBase = path.resolve(basePath);
-  const resolvedFile = path.resolve(filePath);
-  if (!resolvedFile.startsWith(resolvedBase)) {
+  const basePath = process.env.LOCAL_STORAGE_PATH || '/app/uploads';
+  // The storage directory is a runtime volume, not build-time content — tell
+  // Turbopack not to trace these paths, otherwise it includes the whole project.
+  const filePath = path.join(/*turbopackIgnore: true*/ basePath, ...pathSegments);
+
+  // Security: ensure resolved path is still within basePath (require the path
+  // separator so a sibling like `/app/uploads-old` cannot match the prefix).
+  const resolvedBase = path.resolve(/*turbopackIgnore: true*/ basePath);
+  const resolvedFile = path.resolve(/*turbopackIgnore: true*/ filePath);
+  if (resolvedFile !== resolvedBase && !resolvedFile.startsWith(resolvedBase + path.sep)) {
     return NextResponse.json({ error: 'Invalid path' }, { status: 400 });
   }
 
@@ -111,9 +121,13 @@ export async function GET(
     if (missingExt === '.webp' && (parentDir === 'thumb' || parentDir === 'medium')) {
       const regenerated = await storage.ensureImageVariant(resolvedFile);
       if (regenerated) {
-        const stat = await fs.stat(regenerated);
-        fileSize = stat.size;
-        fileFound = true;
+        try {
+          const stat = await fs.stat(regenerated);
+          fileSize = stat.size;
+          fileFound = true;
+        } catch {
+          // Regenerated file vanished before we could stat it — fall back to 404.
+        }
       }
     }
   }
