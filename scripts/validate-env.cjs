@@ -14,5 +14,6 @@ if (require.main === module) {
   }
 
   const storagePath = process.env.LOCAL_STORAGE_PATH || '/app/uploads';
-  console.log(`Environment OK — local storage (${storagePath})`);
+  const quarantinePath = process.env.QUARANTINE_PATH || '(sibling of local storage)';
+  console.log(`Environment OK — local storage (${storagePath}), quarantine (${quarantinePath})`);
 }

@@ -10,6 +10,7 @@ services:
     command: pnpm dev
     environment:
       - NODE_ENV=development
+      - QUARANTINE_PATH=/app/quarantine
       - EVENT_TOKEN=${EVENT_TOKEN:-}
       - RATE_LIMIT_UPLOAD_WINDOW_MS=${RATE_LIMIT_UPLOAD_WINDOW_MS:-300000}
       - RATE_LIMIT_UPLOAD_MAX=${RATE_LIMIT_UPLOAD_MAX:-60}
@@ -22,3 +23,5 @@ services:
       - /app/node_modules
       # Persist uploads
       - wedding-uploads:/app/uploads
+      # Persist quarantine separately (outside the served media root)
+      - wedding-quarantine:/app/quarantine

@@ -20,6 +20,8 @@ services:
       # JS bundle at build time.
       # ---------------------------------------------------------------
       - LOCAL_STORAGE_PATH=/app/uploads
+      # Untrusted/rejected uploads — kept outside the served media root.
+      - QUARANTINE_PATH=/app/quarantine
       - EVENT_TOKEN=${EVENT_TOKEN:-}
       - RATE_LIMIT_UPLOAD_WINDOW_MS=${RATE_LIMIT_UPLOAD_WINDOW_MS:-300000}
       - RATE_LIMIT_UPLOAD_MAX=${RATE_LIMIT_UPLOAD_MAX:-60}
@@ -29,6 +31,8 @@ services:
     volumes:
       # Persist uploaded media across container restarts.
       - wedding-uploads:/app/uploads
+      # Persist quarantined (untrusted) files separately from served media.
+      - wedding-quarantine:/app/quarantine
     restart: unless-stopped
     healthcheck:
       test: ['CMD', 'wget', '--spider', '-q', 'http://localhost:3010/api/health']
@@ -39,3 +43,4 @@ services:
 
 volumes:
   wedding-uploads:
+  wedding-quarantine:

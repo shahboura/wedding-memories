@@ -65,8 +65,8 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 
-# Create uploads directory for local storage
-RUN mkdir -p /app/uploads
+# Create uploads + quarantine directories for local storage
+RUN mkdir -p /app/uploads /app/quarantine
 
 EXPOSE 3010
 
