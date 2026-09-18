@@ -171,5 +171,14 @@
     "title": "404 - Halaman Tidak Dijumpai",
     "description": "Halaman yang anda cari tidak wujud.",
     "goHome": "Ke Halaman Utama"
+  },
+  "eventAccess": {
+    "required": "Akses acara diperlukan",
+    "description": "Sila imbas kod QR acara atau buka pautan acara untuk mengakses galeri.",
+    "tokenPlaceholder": "Masukkan token acara",
+    "tokenRequired": "Sila masukkan token acara.",
+    "unlock": "Buka galeri",
+    "checking": "Memeriksa…",
+    "navigationFailed": "Tidak dapat membuka galeri. Sila cuba lagi."
   }
 }

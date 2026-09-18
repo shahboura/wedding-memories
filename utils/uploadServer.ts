@@ -92,8 +92,16 @@ export async function quarantineFileFromPath(
   const safeFileName = originalName.replace(/[^a-zA-Z0-9._-]/g, '_');
   const quarantineName = `${timestamp}-${randomSuffix}-${safeFileName}`;
 
-  const basePath = process.env.LOCAL_STORAGE_PATH || '/app/uploads';
-  const quarantineDir = path.join(basePath, 'quarantine');
+  // Quarantine lives OUTSIDE the served media root so rejected (untrusted)
+  // files can never be listed or served. Defaults to a sibling of the media
+  // root; override with QUARANTINE_PATH.
+  const mediaRoot = process.env.LOCAL_STORAGE_PATH || '/app/uploads';
+  const quarantineDir =
+    process.env.QUARANTINE_PATH?.trim() ||
+    path.join(
+      /*turbopackIgnore: true*/ path.dirname(path.resolve(/*turbopackIgnore: true*/ mediaRoot)),
+      'quarantine'
+    );
   await fs.mkdir(quarantineDir, { recursive: true });
 
   const quarantinePath = path.join(quarantineDir, quarantineName);
